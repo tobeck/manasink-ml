@@ -42,6 +42,7 @@ dev = [
 
 [project.scripts]
 manasink = "manasink_ml.cli:main"
+manasink-data = "src.data.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
