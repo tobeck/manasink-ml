@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from ..game.card import Card, CardType, Color
+from game.card import Card, CardType, Color
 
 
 # Default database location

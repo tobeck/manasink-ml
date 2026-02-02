@@ -15,7 +15,7 @@ try:
 except ImportError:
     HAS_REQUESTS = False
 
-from ..game.card import Card
+from game.card import Card
 
 
 SCRYFALL_API_BASE = "https://api.scryfall.com"
