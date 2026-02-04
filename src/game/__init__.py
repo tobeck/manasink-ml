@@ -6,19 +6,26 @@ from .card import Card, ManaCost, ManaPool, CardType, Color, BASIC_LANDS
 from .state import GameState, Player, Permanent, Phase, Zone, create_game
 from .actions import Action, ActionType, get_legal_actions, execute_action
 from .simulator import (
-    Simulator, 
-    EpisodeResult, 
+    Simulator,
+    EpisodeResult,
     GoldfishResult,
     Policy,
     RandomPolicy,
     GreedyPolicy,
     create_test_deck,
 )
+from .synergy_policy import (
+    SynergyAwarePolicy,
+    SynergyBonus,
+    SynergyContext,
+    load_synergy_context,
+    create_empty_context,
+)
 
 __all__ = [
     # Card
     "Card",
-    "ManaCost", 
+    "ManaCost",
     "ManaPool",
     "CardType",
     "Color",
@@ -43,4 +50,10 @@ __all__ = [
     "RandomPolicy",
     "GreedyPolicy",
     "create_test_deck",
+    # Synergy Policy
+    "SynergyAwarePolicy",
+    "SynergyBonus",
+    "SynergyContext",
+    "load_synergy_context",
+    "create_empty_context",
 ]

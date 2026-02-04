@@ -2,13 +2,18 @@
 Main game simulator with episode running and goldfish mode.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
-from typing import Optional, Callable
+from typing import Optional, Callable, TYPE_CHECKING
 import random
 
 from .card import Card, BASIC_LANDS, Color
 from .state import GameState, Player, Phase, create_game
 from .actions import Action, ActionType, get_legal_actions, execute_action
+
+if TYPE_CHECKING:
+    from .synergy_policy import SynergyBonus
 
 
 @dataclass
@@ -17,15 +22,18 @@ class EpisodeResult:
     winner: Optional[int]  # Player index who won, None for draw
     turns: int
     final_state: GameState
-    
+
     # Metrics for analysis
     total_damage_dealt: list[int] = field(default_factory=lambda: [0, 0])
     cards_played: list[int] = field(default_factory=lambda: [0, 0])
     lands_played: list[int] = field(default_factory=lambda: [0, 0])
     creatures_cast: list[int] = field(default_factory=lambda: [0, 0])
-    
+
     # Turn-by-turn state for replay/analysis
     history: list[dict] = field(default_factory=list)
+
+    # Synergy bonuses for reward shaping (set by SynergyAwarePolicy)
+    synergy_bonuses: Optional["SynergyBonus"] = None
 
 
 @dataclass 
