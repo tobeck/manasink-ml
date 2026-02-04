@@ -5,6 +5,8 @@ This package provides:
 - ScryfallClient: Direct API access to Scryfall (for ad-hoc queries)
 - CardDatabase: SQLite-backed card storage (for bulk operations)
 - sync_database: Download and populate the card database
+- EDHRecClient: EDHREC API client for commander recommendations
+- sync_edhrec_data: Fetch EDHREC data and populate database
 
 Quick start:
     # First, sync the database (downloads ~30MB)
@@ -16,6 +18,14 @@ Quick start:
     db = CardDatabase()
     card = db.get_card("Sol Ring")
     commanders = db.get_commanders(colors="UG")
+
+    # Sync EDHREC data for recommendations
+    from src.data import sync_edhrec_data
+    sync_edhrec_data(limit=100)
+
+    # Get commander recommendations
+    from src.data import get_commander_recommendations
+    recs = get_commander_recommendations("Atraxa, Praetors' Voice")
 """
 
 from .scryfall import (
@@ -25,6 +35,44 @@ from .scryfall import (
 )
 from .database import CardDatabase
 from .ingest import sync_database, get_database_stats
+from .edhrec import (
+    EDHRecClient,
+    fetch_commander_recommendations,
+    fetch_salt_scores,
+)
+from .edhrec_ingest import (
+    sync_edhrec_data,
+    get_edhrec_stats,
+    get_commander_recommendations,
+    get_salt_scores_from_db,
+    estimate_deck_power,
+    PowerLevelEstimate,
+)
+from .features import (
+    CardFeatures,
+    extract_features_from_scryfall,
+    populate_card_features,
+    get_feature_vector,
+    get_batch_features,
+    get_features_stats,
+)
+from .categories import (
+    populate_card_categories,
+    compute_role_scores,
+    get_card_categories,
+    get_cards_by_category,
+    get_top_cards_per_role,
+    get_categories_stats,
+)
+from .deck_loader import (
+    DeckLoadResult,
+    SynergyData,
+    load_deck_from_edhrec,
+    load_synergy_data,
+    load_deck_with_synergy_data,
+    list_available_commanders,
+    get_deck_stats,
+)
 
 __all__ = [
     # Scryfall API client
@@ -33,7 +81,41 @@ __all__ = [
     "fetch_commander",
     # SQLite database
     "CardDatabase",
-    # Ingestion
+    # Scryfall ingestion
     "sync_database",
     "get_database_stats",
+    # EDHREC API client
+    "EDHRecClient",
+    "fetch_commander_recommendations",
+    "fetch_salt_scores",
+    # EDHREC ingestion
+    "sync_edhrec_data",
+    "get_edhrec_stats",
+    "get_commander_recommendations",
+    "get_salt_scores_from_db",
+    # Power level estimation
+    "estimate_deck_power",
+    "PowerLevelEstimate",
+    # Features
+    "CardFeatures",
+    "extract_features_from_scryfall",
+    "populate_card_features",
+    "get_feature_vector",
+    "get_batch_features",
+    "get_features_stats",
+    # Categories
+    "populate_card_categories",
+    "compute_role_scores",
+    "get_card_categories",
+    "get_cards_by_category",
+    "get_top_cards_per_role",
+    "get_categories_stats",
+    # Deck loading
+    "DeckLoadResult",
+    "SynergyData",
+    "load_deck_from_edhrec",
+    "load_synergy_data",
+    "load_deck_with_synergy_data",
+    "list_available_commanders",
+    "get_deck_stats",
 ]
