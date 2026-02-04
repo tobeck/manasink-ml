@@ -48,18 +48,77 @@ Cards are represented using data from Scryfall API. Key attributes:
 - Power/toughness (creatures)
 - Color identity (critical for Commander)
 
+### ML Features (`CardFeatures`)
+Cards are encoded as 29-dimensional feature vectors for ML:
+- **Mana** (7): W, U, B, R, G, colorless, CMC
+- **Types** (8): creature, instant, sorcery, artifact, enchantment, planeswalker, land, legendary
+- **Stats** (2): power, toughness
+- **Color identity** (5): WUBRG bitmap
+- **Role scores** (7): ramp, card_draw, removal, board_wipe, protection, finisher, utility
+
+```python
+from src.data import get_feature_vector
+features = get_feature_vector("Sol Ring")
+vector = features.to_vector()  # 29-dim list
+```
+
 ### Reward Signals
 - **Goldfish**: Turns to achieve board state milestones
 - **vs Opponent**: Win rate, life differential, board control metrics
 - **Synergy**: Cards that consistently appear in winning game states together
 
+### RL Training Infrastructure
+The `src/models/` package provides PPO-based training:
+
+**State Encoding** (`StateEncoder`):
+- Hand, battlefield, opponent battlefield → padded card tensors
+- Global features: turn, life totals, mana, phase (17 dims)
+- Cards encoded as 29-dim feature vectors
+
+**Policy Network** (`PolicyNetwork`):
+- Card set encoders with mean pooling
+- Shared trunk → policy head (action logits) + value head
+- Action masking for legal actions only
+
+**Training** (`Trainer`):
+- PPO with clipped surrogate objective
+- GAE for advantage estimation
+- Reward shaping: damage dealt + synergy bonuses
+- Checkpoint save/load support
+
+```python
+from src.models import Trainer, TrainingConfig
+from src.game import create_test_deck, Color
+
+deck = create_test_deck({Color.GREEN})
+config = TrainingConfig(num_episodes=1000, learning_rate=3e-4)
+trainer = Trainer(config)
+trainer.train(deck, num_episodes=1000)
+policy = trainer.get_policy()  # Use for inference
+```
+
 ## Key Files
 
-- `src/game/card.py` - Card dataclass and Scryfall integration
-- `src/game/state.py` - GameState with zones (hand, battlefield, graveyard, etc.)
-- `src/game/actions.py` - Legal action generation and execution
-- `src/game/simulator.py` - Main game loop and episode runner
-- `src/data/scryfall.py` - Scryfall API client and caching
+### Game Simulator (`src/game/`)
+- `card.py` - Card dataclass and Scryfall integration
+- `state.py` - GameState with zones (hand, battlefield, graveyard, etc.)
+- `actions.py` - Legal action generation and execution
+- `simulator.py` - Main game loop and episode runner
+- `synergy_policy.py` - Synergy-aware policy using EDHREC data
+
+### Data Pipeline (`src/data/`)
+- `scryfall.py` - Scryfall API client and caching
+- `database.py` - SQLite CardDatabase for bulk storage
+- `edhrec.py` - EDHREC API client
+- `edhrec_ingest.py` - Sync EDHREC recommendations to database
+- `features.py` - ML feature extraction (CardFeatures, 29-dim vectors)
+- `categories.py` - Card role categorization (ramp, removal, etc.)
+- `deck_loader.py` - Load average decks for simulation
+
+### RL Training (`src/models/`)
+- `state_encoder.py` - Converts GameState to tensors for neural networks
+- `policy_network.py` - PolicyNetwork (policy + value heads), NeuralPolicy wrapper
+- `training.py` - PPO Trainer with experience collection and GAE
 
 ## Development Commands
 
@@ -76,6 +135,39 @@ ruff check src/ tests/ --fix
 
 # Type check
 mypy src/
+```
+
+## Data CLI
+
+The `manasink-data` CLI provides data pipeline management:
+
+```bash
+# Sync Scryfall card database (~30MB download)
+manasink-data sync-scryfall
+
+# Sync EDHREC data for top commanders
+manasink-data sync-edhrec --limit 100
+
+# Extract ML features for all cards
+manasink-data extract-features
+
+# Show database statistics
+manasink-data stats
+```
+
+Or programmatically:
+
+```python
+from src.data import sync_database, sync_edhrec_data, populate_card_features
+
+# One-time setup
+sync_database()              # Scryfall cards
+sync_edhrec_data(limit=100)  # EDHREC recommendations
+populate_card_features()     # ML features
+
+# Load deck for simulation
+from src.data import load_deck_from_edhrec
+result = load_deck_from_edhrec("Atraxa, Praetors' Voice")
 ```
 
 ## Design Decisions
