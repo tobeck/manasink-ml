@@ -46,16 +46,15 @@ htmlcov/
 # Type checking
 .mypy_cache/
 
-# Data files (large)
-data/raw/scryfall_bulk.json
-data/raw/scryfall_cache/
-data/processed/*.pt
-data/processed/*.pkl
+# Data files (large, generated at runtime)
+data/
+*.db
 
 # Model checkpoints
-models/checkpoints/
+checkpoints/
 *.ckpt
 *.pth
+*.pt
 
 # Logs
 logs/
