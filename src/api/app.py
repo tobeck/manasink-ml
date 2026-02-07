@@ -73,6 +73,7 @@ tags_metadata = [
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
     logger.info("Starting Manasink ML API...")
+    logger.info(f"Registered routes: {[r.path for r in app.routes]}")
     # Startup: could preload models here
     yield
     # Shutdown: cleanup

@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Python bytecode
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv
+venv
+env
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+*.egg-info
+dist
+build
+.eggs
+
+# Testing
+.pytest_cache
+.coverage
+htmlcov
+.tox
+
+# Documentation
+docs/_build
+
+# Local data (use volumes instead)
+data/
+
+# Development files
+.pre-commit-config.yaml
+.ruff_cache
+*.md
+!README.md
+
+# Docker
+Dockerfile
+docker-compose.yml
+.docker

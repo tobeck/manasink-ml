@@ -57,8 +57,8 @@ WORKDIR /app
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser pyproject.toml README.md ./
 
-# Install the package itself
-RUN pip install -e . --no-deps
+# Uninstall the stub package from builder - we'll use PYTHONPATH instead
+RUN pip uninstall -y manasink-ml 2>/dev/null || true
 
 # Create data directory
 RUN mkdir -p /app/data && chown appuser:appuser /app/data
@@ -69,6 +69,7 @@ USER appuser
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
     # Default to PostgreSQL in container
     DB_TYPE=postgresql \
     DB_HOST=postgres \
