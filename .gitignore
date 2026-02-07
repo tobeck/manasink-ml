@@ -47,7 +47,7 @@ htmlcov/
 .mypy_cache/
 
 # Data files (large, generated at runtime)
-data/
+/data/
 *.db
 
 # Model checkpoints

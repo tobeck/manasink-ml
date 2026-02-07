@@ -321,6 +321,13 @@ class CardDatabase:
 
         return SyncMetadata(last_updated=None, card_count=0, scryfall_updated_at=None)
 
+    def get_card_count(self) -> int:
+        """Get total number of cards in database."""
+        conn = self._get_connection()
+        cursor = conn.execute("SELECT COUNT(*) as count FROM cards")
+        row = cursor.fetchone()
+        return row["count"] if row else 0
+
     def get_scryfall_json(self, name: str) -> Optional[dict]:
         """Get the raw Scryfall JSON for a card (useful for debugging)."""
         conn = self._get_connection()
