@@ -16,14 +16,26 @@ Quick start:
 
 Endpoints:
     GET  /health           - Health check
+    GET  /cache/stats      - Cache statistics
+    POST /cache/clear      - Clear cache
     GET  /commanders       - List available commanders
     POST /recommend/cards  - Get card recommendations
     POST /analyze/deck     - Analyze a deck
     POST /analyze/synergy  - Get synergy scores
     POST /simulate/goldfish - Run goldfish simulation
+
+Caching:
+    Recommendations and synergy scores are cached in Redis when available.
+    Set REDIS_URL environment variable to enable caching.
 """
 
 from .app import app, create_app
+from .cache import (
+    cache,
+    invalidate_commander_cache,
+    invalidate_all_cache,
+    get_cache_stats,
+)
 from .models import (
     # Requests
     RecommendCardsRequest,
@@ -82,4 +94,9 @@ __all__ = [
     "run_simulation",
     "get_health_status",
     "list_commanders",
+    # Caching
+    "cache",
+    "invalidate_commander_cache",
+    "invalidate_all_cache",
+    "get_cache_stats",
 ]

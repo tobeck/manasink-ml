@@ -142,6 +142,23 @@ async def health_check():
     return get_health_status()
 
 
+@app.get("/cache/stats", tags=["Health"])
+async def cache_stats():
+    """Get cache statistics."""
+    from .cache import get_cache_stats
+
+    return get_cache_stats()
+
+
+@app.post("/cache/clear", tags=["Health"])
+async def cache_clear():
+    """Clear all cache entries."""
+    from .cache import invalidate_all_cache
+
+    deleted = invalidate_all_cache()
+    return {"message": f"Cleared {deleted} cache entries"}
+
+
 @app.get("/commanders", tags=["Info"])
 async def get_commanders(
     color_identity: Optional[str] = Query(

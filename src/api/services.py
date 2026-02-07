@@ -6,6 +6,11 @@ Contains the business logic for:
 - Deck analysis
 - Synergy scoring
 - Goldfish simulation
+
+Caching:
+    Results are cached in Redis when available.
+    Cache keys are based on function arguments.
+    TTL defaults to 1 hour for recommendations, 6 hours for synergy.
 """
 
 from collections import defaultdict
@@ -26,8 +31,14 @@ from .models import (
     SimulationResult,
     HealthResponse,
 )
+from .cache import cache, get_cache_stats
 
 logger = logging.getLogger(__name__)
+
+# Cache TTLs (in seconds)
+RECOMMENDATIONS_TTL = 3600  # 1 hour
+SYNERGY_TTL = 21600  # 6 hours
+COMMANDERS_TTL = 3600  # 1 hour
 
 
 # ============================================================================
@@ -69,12 +80,12 @@ def get_health_status() -> HealthResponse:
     )
 
 
-def list_commanders(
-    color_identity: Optional[str] = None,
-    min_decks: int = 100,
-    limit: int = 50,
+def _list_commanders_impl(
+    color_identity: Optional[str],
+    min_decks: int,
+    limit: int,
 ) -> list[dict]:
-    """List available commanders."""
+    """Internal implementation of list_commanders."""
     from src.data.deck_loader import list_available_commanders
 
     return list_available_commanders(
@@ -84,9 +95,128 @@ def list_commanders(
     )
 
 
+def list_commanders(
+    color_identity: Optional[str] = None,
+    min_decks: int = 100,
+    limit: int = 50,
+) -> list[dict]:
+    """List available commanders (cached)."""
+    # Create cache key
+    cache_key = f"commanders:{color_identity or 'all'}:{min_decks}:{limit}"
+
+    # Try cache first
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # Get fresh data
+    result = _list_commanders_impl(color_identity, min_decks, limit)
+
+    # Cache it
+    cache.set(cache_key, result, ttl=COMMANDERS_TTL)
+
+    return result
+
+
 # ============================================================================
 # Recommendation Services
 # ============================================================================
+
+
+def _get_recommendations_impl(
+    commander: str,
+    count: int,
+    exclude_tuple: tuple,  # Tuple for hashability
+    budget: Optional[str],
+    categories_tuple: Optional[tuple],  # Tuple for hashability
+) -> Optional[dict]:
+    """Internal implementation of get_card_recommendations."""
+    from src.data.deck_loader import load_synergy_data
+    from src.data.database import CardDatabase, DEFAULT_DB_PATH
+
+    exclude_set = set(e.lower() for e in exclude_tuple)
+    categories = list(categories_tuple) if categories_tuple else None
+
+    # Load synergy data for commander
+    synergy_data = load_synergy_data(commander)
+    if synergy_data is None:
+        return None
+
+    # Get all recommendations from database
+    import sqlite3
+
+    conn = sqlite3.connect(DEFAULT_DB_PATH)
+    conn.row_factory = sqlite3.Row
+
+    # Find commander ID
+    cursor = conn.execute(
+        "SELECT id FROM commanders WHERE name = ? OR name LIKE ?",
+        (synergy_data.commander_name, f"%{commander}%"),
+    )
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return None
+
+    commander_id = row["id"]
+
+    # Get recommendations
+    cursor = conn.execute(
+        """
+        SELECT card_name, synergy_score, inclusion_rate, category
+        FROM commander_recommendations
+        WHERE commander_id = ?
+        ORDER BY synergy_score DESC, inclusion_rate DESC
+        """,
+        (commander_id,),
+    )
+
+    recommendations = []
+    total_available = 0
+
+    for row in cursor:
+        total_available += 1
+        card_name = row["card_name"]
+
+        # Skip excluded cards
+        if card_name.lower() in exclude_set:
+            continue
+
+        # Filter by category if specified
+        if categories:
+            card_category = row["category"] or ""
+            if not any(cat.lower() in card_category.lower() for cat in categories):
+                continue
+
+        # Get additional card info
+        card_info = _get_card_info(conn, card_name)
+
+        recommendations.append(
+            {
+                "name": card_name,
+                "synergy_score": row["synergy_score"] or 0.0,
+                "inclusion_rate": row["inclusion_rate"] or 0.0,
+                "category": row["category"],
+                "cmc": card_info.get("cmc", 0),
+                "type_line": card_info.get("type_line"),
+                "reason": _generate_recommendation_reason(
+                    row["synergy_score"],
+                    row["inclusion_rate"],
+                    row["category"],
+                ),
+            }
+        )
+
+        if len(recommendations) >= count:
+            break
+
+    conn.close()
+
+    return {
+        "commander": synergy_data.commander_name,
+        "recommendations": recommendations,
+        "total_available": total_available,
+    }
 
 
 def get_card_recommendations(
@@ -97,7 +227,7 @@ def get_card_recommendations(
     categories: Optional[list[str]] = None,
 ) -> Optional[RecommendCardsResponse]:
     """
-    Get card recommendations for a commander.
+    Get card recommendations for a commander (cached).
 
     Args:
         commander: Commander name
@@ -109,11 +239,38 @@ def get_card_recommendations(
     Returns:
         RecommendCardsResponse or None if commander not found
     """
-    from src.data.deck_loader import load_synergy_data
-    from src.data.database import CardDatabase, DEFAULT_DB_PATH
+    # Convert to tuples for cache key hashing
+    exclude_tuple = tuple(sorted(exclude)) if exclude else ()
+    categories_tuple = tuple(sorted(categories)) if categories else None
 
-    exclude = exclude or []
-    exclude_set = set(c.lower() for c in exclude)
+    # Create cache key (exclude affects results, so include in key)
+    cache_key = f"recommendations:{commander.lower()}:{count}:{hash(exclude_tuple)}:{budget}:{hash(categories_tuple) if categories_tuple else 'none'}"
+
+    # Try cache first (only for requests without exclusions)
+    if not exclude_tuple:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return RecommendCardsResponse(
+                commander=cached["commander"],
+                recommendations=[CardRecommendation(**r) for r in cached["recommendations"]],
+                total_available=cached["total_available"],
+            )
+
+    # Get fresh data
+    result = _get_recommendations_impl(commander, count, exclude_tuple, budget, categories_tuple)
+
+    if result is None:
+        return None
+
+    # Cache it (only if no exclusions - exclusions are user-specific)
+    if not exclude_tuple:
+        cache.set(cache_key, result, ttl=RECOMMENDATIONS_TTL)
+
+    return RecommendCardsResponse(
+        commander=result["commander"],
+        recommendations=[CardRecommendation(**r) for r in result["recommendations"]],
+        total_available=result["total_available"],
+    )
 
     # Load synergy data for commander
     synergy_data = load_synergy_data(commander)
@@ -463,25 +620,15 @@ def _generate_suggestions(
 # ============================================================================
 
 
-def get_synergy_scores(
-    commander: str,
-    cards: list[str],
-) -> Optional[SynergyResponse]:
-    """
-    Get synergy scores for cards with a commander.
-
-    Args:
-        commander: Commander name
-        cards: List of card names to analyze
-
-    Returns:
-        SynergyResponse or None if commander not found
-    """
+def _get_synergy_impl(commander: str, cards_tuple: tuple) -> Optional[dict]:
+    """Internal implementation of get_synergy_scores."""
     from src.data.deck_loader import load_synergy_data
 
     synergy_data = load_synergy_data(commander)
     if synergy_data is None:
         return None
+
+    cards = list(cards_tuple)
 
     # Get individual synergies
     card_synergies = {}
@@ -497,22 +644,71 @@ def get_synergy_scores(
             combined = (syn1 + syn2) / 2
 
             pair_synergies.append(
-                CardSynergy(
-                    card1=card1,
-                    card2=card2,
-                    synergy_score=combined,
-                    reason=_get_pair_reason(syn1, syn2),
-                )
+                {
+                    "card1": card1,
+                    "card2": card2,
+                    "synergy_score": combined,
+                    "reason": _get_pair_reason(syn1, syn2),
+                }
             )
 
     avg_synergy = sum(card_synergies.values()) / len(card_synergies) if card_synergies else 0
 
+    return {
+        "commander": synergy_data.commander_name,
+        "cards": cards,
+        "average_synergy": round(avg_synergy, 3),
+        "card_synergies": card_synergies,
+        "pair_synergies": pair_synergies,
+    }
+
+
+def get_synergy_scores(
+    commander: str,
+    cards: list[str],
+) -> Optional[SynergyResponse]:
+    """
+    Get synergy scores for cards with a commander (cached).
+
+    Args:
+        commander: Commander name
+        cards: List of card names to analyze
+
+    Returns:
+        SynergyResponse or None if commander not found
+    """
+    # Convert to tuple for cache key
+    cards_tuple = tuple(sorted(cards))
+
+    # Create cache key
+    cache_key = f"synergy:{commander.lower()}:{hash(cards_tuple)}"
+
+    # Try cache first
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return SynergyResponse(
+            commander=cached["commander"],
+            cards=cached["cards"],
+            average_synergy=cached["average_synergy"],
+            card_synergies=cached["card_synergies"],
+            pair_synergies=[CardSynergy(**p) for p in cached["pair_synergies"]],
+        )
+
+    # Get fresh data
+    result = _get_synergy_impl(commander, cards_tuple)
+
+    if result is None:
+        return None
+
+    # Cache it
+    cache.set(cache_key, result, ttl=SYNERGY_TTL)
+
     return SynergyResponse(
-        commander=synergy_data.commander_name,
-        cards=cards,
-        average_synergy=round(avg_synergy, 3),
-        card_synergies=card_synergies,
-        pair_synergies=pair_synergies,
+        commander=result["commander"],
+        cards=result["cards"],
+        average_synergy=result["average_synergy"],
+        card_synergies=result["card_synergies"],
+        pair_synergies=[CardSynergy(**p) for p in result["pair_synergies"]],
     )
 
 
