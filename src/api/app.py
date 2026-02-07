@@ -338,6 +338,51 @@ async def simulate_goldfish(request: SimulateRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get(
+    "/simulate/commander/{commander_name}",
+    response_model=SimulateResponse,
+    responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    tags=["Simulation"],
+)
+async def simulate_commander_deck(
+    commander_name: str,
+    num_games: int = Query(default=10, ge=1, le=100),
+    max_turns: int = Query(default=15, ge=1, le=30),
+    seed: int | None = Query(default=None),
+):
+    """
+    Run goldfish simulation with a commander's average EDHREC deck.
+
+    This is the easiest way to test - just provide a commander name
+    and it loads the average deck from EDHREC data automatically.
+
+    Example: GET /simulate/commander/Atraxa%2C%20Praetors%27%20Voice?num_games=5
+    """
+    from .services import run_commander_simulation
+
+    try:
+        result = run_commander_simulation(
+            commander=commander_name,
+            num_games=num_games,
+            max_turns=max_turns,
+            seed=seed,
+        )
+
+        if result is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Commander '{commander_name}' not found or no average deck available",
+            )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error running commander simulation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ============================================================================
 # Main entry point
 # ============================================================================

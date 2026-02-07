@@ -642,6 +642,95 @@ def _get_pair_reason(syn1: float, syn2: float) -> str:
 # ============================================================================
 
 
+def run_commander_simulation(
+    commander: str,
+    num_games: int = 10,
+    max_turns: int = 15,
+    seed: int | None = None,
+) -> SimulateResponse | None:
+    """
+    Run goldfish simulation using a commander's average EDHREC deck.
+
+    Args:
+        commander: Commander name
+        num_games: Number of games to simulate
+        max_turns: Max turns per game
+        seed: Random seed for reproducibility
+
+    Returns:
+        SimulateResponse or None if commander/deck not found
+    """
+    from src.data.deck_loader import load_deck_from_edhrec
+    from src.game import GreedyPolicy, Simulator
+
+    # Load the average deck for this commander
+    deck_result = load_deck_from_edhrec(commander)
+    if deck_result is None:
+        return None
+
+    if len(deck_result.deck) < 40:
+        logger.warning(
+            f"Commander '{commander}' deck too small: {len(deck_result.deck)} cards"
+        )
+        return None
+
+    # Run simulations
+    sim = Simulator(max_turns=max_turns)
+    policy = GreedyPolicy()
+
+    results = []
+    damage_by_turn = defaultdict(list)
+
+    base_seed = seed if seed is not None else 0
+
+    for i in range(num_games):
+        game_seed = base_seed + i if seed is not None else None
+        result = sim.run_goldfish(
+            deck_result.deck,
+            policy,
+            commander=deck_result.commander,
+            seed=game_seed,
+        )
+
+        results.append(
+            SimulationResult(
+                game_id=i,
+                turns=result.turns_to_kill,
+                total_damage=result.total_damage,
+                cards_played=result.cards_played,
+                lands_played=len([d for d in result.turn_damage if d >= 0]),
+                won=result.total_damage >= 40,
+            )
+        )
+
+        # Track damage by turn
+        for turn, damage in enumerate(result.turn_damage):
+            damage_by_turn[turn].append(damage)
+
+    # Calculate aggregates
+    avg_damage = sum(r.total_damage for r in results) / len(results)
+    avg_turns = sum(r.turns for r in results) / len(results)
+    avg_cards = sum(r.cards_played for r in results) / len(results)
+    win_rate = sum(1 for r in results if r.won) / len(results) * 100
+
+    # Average damage per turn
+    max_turn = max(damage_by_turn.keys()) if damage_by_turn else 0
+    avg_damage_by_turn = [
+        sum(damage_by_turn.get(t, [0])) / max(len(damage_by_turn.get(t, [1])), 1)
+        for t in range(max_turn + 1)
+    ]
+
+    return SimulateResponse(
+        num_games=num_games,
+        results=results,
+        avg_damage=round(avg_damage, 1),
+        avg_turns=round(avg_turns, 1),
+        avg_cards_played=round(avg_cards, 1),
+        win_rate=round(win_rate, 1),
+        damage_by_turn=avg_damage_by_turn,
+    )
+
+
 def run_simulation(
     decklist: list[str],
     commander: str | None = None,
