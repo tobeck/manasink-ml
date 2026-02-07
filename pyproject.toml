@@ -20,9 +20,13 @@ dependencies = [
     "requests>=2.28.0",
     "pydantic>=2.0.0",
     "tqdm>=4.65.0",
+    "sqlalchemy>=2.0.0",
 ]
 
 [project.optional-dependencies]
+postgres = [
+    "psycopg2-binary>=2.9.0",
+]
 ml = [
     "torch>=2.0.0",
     "torch-geometric>=2.3.0",

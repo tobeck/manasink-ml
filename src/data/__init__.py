@@ -3,10 +3,24 @@ Data ingestion and processing package.
 
 This package provides:
 - ScryfallClient: Direct API access to Scryfall (for ad-hoc queries)
-- CardDatabase: SQLite-backed card storage (for bulk operations)
+- CardDatabase: Database-backed card storage (SQLite or PostgreSQL)
 - sync_database: Download and populate the card database
 - EDHRecClient: EDHREC API client for commander recommendations
 - sync_edhrec_data: Fetch EDHREC data and populate database
+
+Database Configuration:
+    Set DATABASE_URL environment variable to use PostgreSQL:
+        DATABASE_URL=postgresql://user:pass@host:5432/manasink
+
+    Or use individual settings:
+        DB_TYPE=postgresql
+        DB_HOST=localhost
+        DB_PORT=5432
+        DB_NAME=manasink
+        DB_USER=postgres
+        DB_PASSWORD=secret
+
+    Default is SQLite at data/cards.db
 
 Quick start:
     # First, sync the database (downloads ~30MB)
@@ -28,6 +42,7 @@ Quick start:
     recs = get_commander_recommendations("Atraxa, Praetors' Voice")
 """
 
+from .db_config import DatabaseConfig, DatabaseManager, get_db_session
 from .scryfall import (
     ScryfallClient,
     fetch_card,
@@ -75,11 +90,15 @@ from .deck_loader import (
 )
 
 __all__ = [
+    # Database configuration
+    "DatabaseConfig",
+    "DatabaseManager",
+    "get_db_session",
     # Scryfall API client
     "ScryfallClient",
     "fetch_card",
     "fetch_commander",
-    # SQLite database
+    # Database (SQLite or PostgreSQL)
     "CardDatabase",
     # Scryfall ingestion
     "sync_database",

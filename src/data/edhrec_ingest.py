@@ -3,7 +3,7 @@ EDHREC data ingestion module.
 
 This module handles:
 - Fetching top commanders and their recommendations from EDHREC
-- Storing data in SQLite alongside Scryfall card data
+- Storing data in the database alongside Scryfall card data
 - Linking EDHREC card names to Scryfall IDs
 - Power level estimation using salt scores
 
@@ -16,7 +16,6 @@ Or via CLI:
 """
 
 import json
-import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -29,7 +28,15 @@ try:
 except ImportError:
     HAS_TQDM = False
 
-from .database import DEFAULT_DB_PATH, create_edhrec_schema
+from .db_config import DatabaseConfig, DatabaseManager
+from .db_models import (
+    CardModel,
+    CommanderModel,
+    CommanderRecommendation,
+    AverageDeckCard,
+    CardSaltScore,
+    EDHRecSyncMetadata,
+)
 from .edhrec import EDHRecClient
 
 
@@ -93,7 +100,7 @@ def estimate_deck_power(
 
 
 def sync_edhrec_data(
-    db_path: Optional[Path] = None,
+    config: Optional[DatabaseConfig] = None,
     limit: int = 100,
     force: bool = False,
     show_progress: bool = True,
@@ -105,7 +112,7 @@ def sync_edhrec_data(
     and global salt scores. Links card names to Scryfall IDs when possible.
 
     Args:
-        db_path: Path to SQLite database
+        config: Database configuration
         limit: Number of top commanders to sync
         force: Force re-fetch even if recently synced
         show_progress: Show progress bars
@@ -113,8 +120,6 @@ def sync_edhrec_data(
     Returns:
         Dict with sync results
     """
-    db_path = db_path or DEFAULT_DB_PATH
-
     result = {
         "commanders_synced": 0,
         "recommendations_synced": 0,
@@ -123,38 +128,29 @@ def sync_edhrec_data(
         "skipped": False,
     }
 
-    # Ensure database exists with EDHREC tables
-    if not db_path.exists():
-        print(f"Database not found at {db_path}")
-        print("Run 'manasink-data sync' first to create the card database.")
-        return result
-
-    # Create EDHREC schema (tables created if not exist)
-    conn = create_edhrec_schema(db_path)
-    conn.row_factory = sqlite3.Row
+    # Set up database
+    manager = DatabaseManager(config) if config else DatabaseManager()
+    manager.create_tables()
+    session = manager.session()
 
     # Check if we need to sync
     if not force:
-        cursor = conn.execute(
-            "SELECT last_updated FROM edhrec_sync_metadata ORDER BY id DESC LIMIT 1"
-        )
-        row = cursor.fetchone()
-        if row and row["last_updated"]:
-            # Check if synced within last 24 hours
-            last_sync = datetime.fromisoformat(row["last_updated"])
-            hours_since = (datetime.now() - last_sync).total_seconds() / 3600
+        metadata = session.query(EDHRecSyncMetadata).order_by(EDHRecSyncMetadata.id.desc()).first()
+        if metadata and metadata.last_updated:
+            hours_since = (datetime.utcnow() - metadata.last_updated).total_seconds() / 3600
             if hours_since < 24:
                 print(f"EDHREC data synced {hours_since:.1f} hours ago. Use --force to re-sync.")
                 result["skipped"] = True
-                conn.close()
+                session.close()
                 return result
 
     client = EDHRecClient()
 
     # Build a card name -> scryfall_id lookup from existing cards table
     print("Building card name lookup...")
-    cursor = conn.execute("SELECT name, scryfall_id FROM cards")
-    card_lookup = {row["name"]: row["scryfall_id"] for row in cursor}
+    card_lookup = {
+        row.name: row.scryfall_id for row in session.query(CardModel.name, CardModel.scryfall_id)
+    }
     print(f"  Found {len(card_lookup):,} cards in database")
 
     # Step 1: Fetch top commanders
@@ -179,33 +175,40 @@ def sync_edhrec_data(
         if not cmd_data:
             continue
 
-        # Insert/update commander record
         scryfall_id = card_lookup.get(cmd_name)
         color_identity = "".join(sorted(cmd_data.get("color_identity", [])))
 
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO commanders
-            (name, name_slug, scryfall_id, edhrec_rank, num_decks,
-             salt_score, color_identity, last_synced, edhrec_json)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                cmd_name,
-                cmd_slug,
-                scryfall_id,
-                cmd_data.get("edhrec_rank"),
-                cmd_data.get("num_decks", 0),
-                cmd_data.get("salt_score"),
-                color_identity,
-                datetime.now().isoformat(),
-                json.dumps(cmd_data.get("raw_data")),
-            ),
-        )
+        # Upsert commander record
+        existing = session.query(CommanderModel).filter_by(name=cmd_name).first()
+        if existing:
+            existing.name_slug = cmd_slug
+            existing.scryfall_id = scryfall_id
+            existing.edhrec_rank = cmd_data.get("edhrec_rank")
+            existing.num_decks = cmd_data.get("num_decks", 0)
+            existing.salt_score = cmd_data.get("salt_score")
+            existing.color_identity = color_identity
+            existing.last_synced = datetime.utcnow()
+            existing.edhrec_json = json.dumps(cmd_data.get("raw_data"))
+            commander_model = existing
+        else:
+            commander_model = CommanderModel(
+                name=cmd_name,
+                name_slug=cmd_slug,
+                scryfall_id=scryfall_id,
+                edhrec_rank=cmd_data.get("edhrec_rank"),
+                num_decks=cmd_data.get("num_decks", 0),
+                salt_score=cmd_data.get("salt_score"),
+                color_identity=color_identity,
+                last_synced=datetime.utcnow(),
+                edhrec_json=json.dumps(cmd_data.get("raw_data")),
+            )
+            session.add(commander_model)
 
-        # Get commander ID
-        cursor = conn.execute("SELECT id FROM commanders WHERE name = ?", (cmd_name,))
-        commander_id = cursor.fetchone()["id"]
+        session.flush()  # Get commander ID
+
+        # Clear existing recommendations for this commander
+        session.query(CommanderRecommendation).filter_by(commander_id=commander_model.id).delete()
+        session.query(AverageDeckCard).filter_by(commander_id=commander_model.id).delete()
 
         # Insert recommendations
         recommendations = cmd_data.get("recommendations", [])
@@ -214,82 +217,64 @@ def sync_edhrec_data(
             if not card_name:
                 continue
 
-            rec_scryfall_id = card_lookup.get(card_name)
-
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO commander_recommendations
-                (commander_id, card_name, scryfall_id, inclusion_rate,
-                 synergy_score, num_decks, category)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    commander_id,
-                    card_name,
-                    rec_scryfall_id,
-                    rec.get("inclusion_rate", 0),
-                    rec.get("synergy_score", 0),
-                    rec.get("num_decks", 0),
-                    rec.get("category", ""),
-                ),
+            rec_model = CommanderRecommendation(
+                commander_id=commander_model.id,
+                card_name=card_name,
+                scryfall_id=card_lookup.get(card_name),
+                inclusion_rate=rec.get("inclusion_rate", 0),
+                synergy_score=rec.get("synergy_score", 0),
+                num_decks=rec.get("num_decks", 0),
+                category=rec.get("category", ""),
             )
+            session.add(rec_model)
             result["recommendations_synced"] += 1
 
         # Fetch and insert average deck
         avg_deck = client.get_average_deck(cmd_name, use_cache=not force)
         for slot_num, card_name in enumerate(avg_deck):
-            avg_scryfall_id = card_lookup.get(card_name)
-
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO average_decks
-                (commander_id, card_name, scryfall_id, slot_number)
-                VALUES (?, ?, ?, ?)
-                """,
-                (commander_id, card_name, avg_scryfall_id, slot_num),
+            avg_model = AverageDeckCard(
+                commander_id=commander_model.id,
+                card_name=card_name,
+                scryfall_id=card_lookup.get(card_name),
+                slot_number=slot_num,
             )
+            session.add(avg_model)
             result["average_deck_cards"] += 1
 
         result["commanders_synced"] += 1
-        conn.commit()
+        session.commit()
 
     # Step 3: Fetch global salt scores
     print("\nFetching salt scores...")
     salt_scores = client.get_salt_scores(use_cache=not force)
     print(f"  Found {len(salt_scores)} salt scores")
 
+    # Clear existing salt scores
+    session.query(CardSaltScore).delete()
+
     # Insert salt scores with rank
     sorted_salt = sorted(salt_scores.items(), key=lambda x: x[1], reverse=True)
     for rank, (card_name, salt_score) in enumerate(sorted_salt, 1):
-        salt_scryfall_id = card_lookup.get(card_name)
-
-        conn.execute(
-            """
-            INSERT OR REPLACE INTO card_salt_scores
-            (card_name, scryfall_id, salt_score, salt_rank)
-            VALUES (?, ?, ?, ?)
-            """,
-            (card_name, salt_scryfall_id, salt_score, rank),
+        salt_model = CardSaltScore(
+            card_name=card_name,
+            scryfall_id=card_lookup.get(card_name),
+            salt_score=salt_score,
+            salt_rank=rank,
         )
+        session.add(salt_model)
         result["salt_scores_synced"] += 1
 
     # Record sync metadata
-    conn.execute(
-        """
-        INSERT INTO edhrec_sync_metadata
-        (last_updated, commanders_synced, cards_synced, salt_cards_synced)
-        VALUES (?, ?, ?, ?)
-        """,
-        (
-            datetime.now().isoformat(),
-            result["commanders_synced"],
-            result["recommendations_synced"],
-            result["salt_scores_synced"],
-        ),
+    metadata = EDHRecSyncMetadata(
+        last_updated=datetime.utcnow(),
+        commanders_synced=result["commanders_synced"],
+        cards_synced=result["recommendations_synced"],
+        salt_cards_synced=result["salt_scores_synced"],
     )
+    session.add(metadata)
 
-    conn.commit()
-    conn.close()
+    session.commit()
+    session.close()
 
     print(f"\nEDHREC sync complete!")
     print(f"  Commanders: {result['commanders_synced']}")
@@ -300,86 +285,66 @@ def sync_edhrec_data(
     return result
 
 
-def get_edhrec_stats(db_path: Optional[Path] = None) -> dict:
+def get_edhrec_stats(config: Optional[DatabaseConfig] = None) -> dict:
     """
     Get statistics about the EDHREC data in the database.
 
     Returns:
         Dict with EDHREC statistics
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    try:
+        manager = DatabaseManager(config) if config else DatabaseManager()
+        session = manager.session()
 
-    if not db_path.exists():
-        return {"exists": False}
+        stats = {"exists": True, "edhrec_initialized": True}
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+        # Commander count
+        stats["commanders"] = session.query(CommanderModel).count()
 
-    stats = {"exists": True, "path": str(db_path)}
+        # Recommendations count
+        stats["recommendations"] = session.query(CommanderRecommendation).count()
 
-    # Check if EDHREC tables exist
-    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='commanders'")
-    if not cursor.fetchone():
-        stats["edhrec_initialized"] = False
-        conn.close()
+        # Average deck cards
+        stats["average_deck_cards"] = session.query(AverageDeckCard).count()
+
+        # Salt scores count
+        stats["salt_scores"] = session.query(CardSaltScore).count()
+
+        # Top 5 commanders by deck count
+        top_commanders = (
+            session.query(CommanderModel).order_by(CommanderModel.num_decks.desc()).limit(5).all()
+        )
+        stats["top_commanders"] = [
+            {"name": c.name, "num_decks": c.num_decks, "rank": c.edhrec_rank}
+            for c in top_commanders
+        ]
+
+        # Highest salt cards
+        top_salt = (
+            session.query(CardSaltScore).order_by(CardSaltScore.salt_score.desc()).limit(5).all()
+        )
+        stats["highest_salt"] = [
+            {"name": s.card_name, "salt": s.salt_score, "rank": s.salt_rank} for s in top_salt
+        ]
+
+        # Sync metadata
+        metadata = session.query(EDHRecSyncMetadata).order_by(EDHRecSyncMetadata.id.desc()).first()
+        if metadata:
+            stats["last_updated"] = (
+                metadata.last_updated.isoformat() if metadata.last_updated else None
+            )
+            stats["last_commanders_synced"] = metadata.commanders_synced
+
+        session.close()
         return stats
 
-    stats["edhrec_initialized"] = True
-
-    # Commander count
-    cursor = conn.execute("SELECT COUNT(*) as count FROM commanders")
-    stats["commanders"] = cursor.fetchone()["count"]
-
-    # Recommendations count
-    cursor = conn.execute("SELECT COUNT(*) as count FROM commander_recommendations")
-    stats["recommendations"] = cursor.fetchone()["count"]
-
-    # Average deck cards
-    cursor = conn.execute("SELECT COUNT(*) as count FROM average_decks")
-    stats["average_deck_cards"] = cursor.fetchone()["count"]
-
-    # Salt scores count
-    cursor = conn.execute("SELECT COUNT(*) as count FROM card_salt_scores")
-    stats["salt_scores"] = cursor.fetchone()["count"]
-
-    # Top 5 commanders by deck count
-    cursor = conn.execute("""
-        SELECT name, num_decks, edhrec_rank
-        FROM commanders
-        ORDER BY num_decks DESC
-        LIMIT 5
-        """)
-    stats["top_commanders"] = [
-        {"name": row["name"], "num_decks": row["num_decks"], "rank": row["edhrec_rank"]}
-        for row in cursor
-    ]
-
-    # Highest salt cards
-    cursor = conn.execute("""
-        SELECT card_name, salt_score, salt_rank
-        FROM card_salt_scores
-        ORDER BY salt_score DESC
-        LIMIT 5
-        """)
-    stats["highest_salt"] = [
-        {"name": row["card_name"], "salt": row["salt_score"], "rank": row["salt_rank"]}
-        for row in cursor
-    ]
-
-    # Sync metadata
-    cursor = conn.execute("SELECT * FROM edhrec_sync_metadata ORDER BY id DESC LIMIT 1")
-    row = cursor.fetchone()
-    if row:
-        stats["last_updated"] = row["last_updated"]
-        stats["last_commanders_synced"] = row["commanders_synced"]
-
-    conn.close()
-    return stats
+    except Exception as e:
+        return {"exists": False, "edhrec_initialized": False, "error": str(e)}
 
 
 def get_commander_recommendations(
     commander_name: str,
-    db_path: Optional[Path] = None,
+    config: Optional[DatabaseConfig] = None,
     limit: int = 50,
     min_synergy: Optional[float] = None,
     category: Optional[str] = None,
@@ -389,7 +354,7 @@ def get_commander_recommendations(
 
     Args:
         commander_name: Name of the commander
-        db_path: Path to SQLite database
+        config: Database configuration
         limit: Maximum results to return
         min_synergy: Minimum synergy score filter
         category: Filter by category (e.g., "Creatures", "Ramp")
@@ -397,85 +362,69 @@ def get_commander_recommendations(
     Returns:
         List of recommendation dicts
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    try:
+        manager = DatabaseManager(config) if config else DatabaseManager()
+        session = manager.session()
 
-    if not db_path.exists():
+        # Find commander
+        commander = (
+            session.query(CommanderModel)
+            .filter(
+                (CommanderModel.name == commander_name)
+                | (CommanderModel.name.ilike(f"%{commander_name}%"))
+            )
+            .first()
+        )
+
+        if not commander:
+            session.close()
+            return []
+
+        # Build query
+        query = session.query(CommanderRecommendation).filter_by(commander_id=commander.id)
+
+        if min_synergy is not None:
+            query = query.filter(CommanderRecommendation.synergy_score >= min_synergy)
+
+        if category:
+            query = query.filter(CommanderRecommendation.category.ilike(f"%{category}%"))
+
+        results = query.order_by(CommanderRecommendation.synergy_score.desc()).limit(limit).all()
+
+        recommendations = [
+            {
+                "card_name": r.card_name,
+                "inclusion_rate": r.inclusion_rate,
+                "synergy_score": r.synergy_score,
+                "num_decks": r.num_decks,
+                "category": r.category,
+            }
+            for r in results
+        ]
+
+        session.close()
+        return recommendations
+
+    except Exception:
         return []
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
 
-    # Find commander
-    cursor = conn.execute(
-        "SELECT id FROM commanders WHERE name = ? OR name LIKE ?",
-        (commander_name, f"%{commander_name}%"),
-    )
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
-        return []
-
-    commander_id = row["id"]
-
-    # Build query
-    conditions = ["commander_id = ?"]
-    params = [commander_id]
-
-    if min_synergy is not None:
-        conditions.append("synergy_score >= ?")
-        params.append(min_synergy)
-
-    if category:
-        conditions.append("category LIKE ?")
-        params.append(f"%{category}%")
-
-    where_clause = " AND ".join(conditions)
-
-    cursor = conn.execute(
-        f"""
-        SELECT card_name, inclusion_rate, synergy_score, num_decks, category
-        FROM commander_recommendations
-        WHERE {where_clause}
-        ORDER BY synergy_score DESC
-        LIMIT ?
-        """,
-        params + [limit],
-    )
-
-    recommendations = [
-        {
-            "card_name": row["card_name"],
-            "inclusion_rate": row["inclusion_rate"],
-            "synergy_score": row["synergy_score"],
-            "num_decks": row["num_decks"],
-            "category": row["category"],
-        }
-        for row in cursor
-    ]
-
-    conn.close()
-    return recommendations
-
-
-def get_salt_scores_from_db(
-    db_path: Optional[Path] = None,
-) -> dict[str, float]:
+def get_salt_scores_from_db(config: Optional[DatabaseConfig] = None) -> dict[str, float]:
     """
     Get all salt scores from the database.
 
     Returns:
         Dict mapping card names to salt scores
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    try:
+        manager = DatabaseManager(config) if config else DatabaseManager()
+        session = manager.session()
 
-    if not db_path.exists():
+        results = session.query(CardSaltScore).all()
+        scores = {r.card_name: r.salt_score for r in results}
+
+        session.close()
+        return scores
+
+    except Exception:
         return {}
-
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-
-    cursor = conn.execute("SELECT card_name, salt_score FROM card_salt_scores")
-    scores = {row["card_name"]: row["salt_score"] for row in cursor}
-
-    conn.close()
-    return scores
