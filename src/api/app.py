@@ -6,6 +6,11 @@ Provides endpoints for:
 - Deck analysis with simulation
 - Synergy scoring between cards
 - Goldfish simulation
+
+API Documentation:
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI JSON: http://localhost:8000/openapi.json
 """
 
 from contextlib import asynccontextmanager
@@ -14,6 +19,7 @@ import logging
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
 from .models import (
     RecommendCardsRequest,
@@ -40,6 +46,30 @@ from .services import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# OpenAPI tag descriptions for Swagger UI organization
+tags_metadata = [
+    {
+        "name": "Health",
+        "description": "API health checks and status information.",
+    },
+    {
+        "name": "Info",
+        "description": "Browse available commanders and card data.",
+    },
+    {
+        "name": "Recommendations",
+        "description": "Get card recommendations for your commander deck.",
+    },
+    {
+        "name": "Analysis",
+        "description": "Analyze deck composition, synergies, and performance.",
+    },
+    {
+        "name": "Simulation",
+        "description": "Run goldfish simulations to test deck performance.",
+    },
+]
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -54,9 +84,41 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app
 app = FastAPI(
     title="Manasink ML API",
-    description="Machine learning-powered MTG Commander card recommendations",
+    description="""
+## MTG Commander Card Recommendations
+
+Machine learning-powered card recommendations for Magic: The Gathering Commander decks.
+
+### Features
+
+- **Card Recommendations**: Get personalized card suggestions based on your commander
+- **Deck Analysis**: Analyze your deck's mana curve, role distribution, and performance
+- **Synergy Scoring**: Evaluate how well cards work together
+- **Goldfish Simulation**: Test deck consistency and damage output
+
+### Getting Started
+
+1. Check `/commanders` to see available commanders with data
+2. Use `/recommend/cards` to get recommendations for your commander
+3. Analyze your deck with `/analyze/deck` to get improvement suggestions
+
+### Data Sources
+
+- Card data from [Scryfall](https://scryfall.com/)
+- Commander recommendations from [EDHREC](https://edhrec.com/)
+- Synergy scores derived from deck co-occurrence and simulation
+""",
     version="0.1.0",
     lifespan=lifespan,
+    openapi_tags=tags_metadata,
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    contact={
+        "name": "Manasink",
+        "url": "https://github.com/tobeck/manasink-ml",
+    },
 )
 
 # Add CORS middleware for frontend access

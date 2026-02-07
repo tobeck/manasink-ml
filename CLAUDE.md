@@ -192,6 +192,11 @@ uvicorn src.api.app:app --reload --port 8000
 python -m src.api.app
 ```
 
+**Documentation:**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI JSON: http://localhost:8000/openapi.json
+
 **Endpoints:**
 - `GET  /health` - Health check with database status
 - `GET  /commanders` - List available commanders

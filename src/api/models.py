@@ -1,10 +1,14 @@
 """
 Pydantic models for API requests and responses.
+
+These models provide:
+- Request validation with meaningful constraints
+- Response serialization
+- OpenAPI schema generation with examples for Swagger UI
 """
 
 from typing import Optional
-from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, Field, ConfigDict
 
 # ============================================================================
 # Request Models
@@ -26,6 +30,18 @@ class RecommendCardsRequest(BaseModel):
         description="Filter by categories: 'Ramp', 'Card Draw', 'Removal', etc.",
     )
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "commander": "Atraxa, Praetors' Voice",
+                "count": 10,
+                "exclude": ["Sol Ring", "Command Tower"],
+                "budget": "medium",
+                "categories": ["Ramp", "Card Draw"],
+            }
+        }
+    )
+
 
 class AnalyzeDeckRequest(BaseModel):
     """Request for deck analysis."""
@@ -40,6 +56,24 @@ class AnalyzeDeckRequest(BaseModel):
     )
     max_turns: int = Field(default=10, ge=1, le=20, description="Max turns per simulation")
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "commander": "Atraxa, Praetors' Voice",
+                "decklist": [
+                    "Sol Ring",
+                    "Arcane Signet",
+                    "Command Tower",
+                    "Deepglow Skate",
+                    "Doubling Season",
+                ]
+                + ["Forest"] * 35,
+                "num_simulations": 10,
+                "max_turns": 10,
+            }
+        }
+    )
+
 
 class SynergyRequest(BaseModel):
     """Request for synergy analysis."""
@@ -52,6 +86,15 @@ class SynergyRequest(BaseModel):
         description="Cards to analyze for synergy",
     )
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "commander": "Atraxa, Praetors' Voice",
+                "cards": ["Deepglow Skate", "Doubling Season", "Vorinclex, Monstrous Raider"],
+            }
+        }
+    )
+
 
 class SimulateRequest(BaseModel):
     """Request for goldfish simulation."""
@@ -61,6 +104,25 @@ class SimulateRequest(BaseModel):
     num_games: int = Field(default=10, ge=1, le=100, description="Number of games to simulate")
     max_turns: int = Field(default=15, ge=1, le=30, description="Max turns per game")
     seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "commander": "Zhulodok, Void Gorger",
+                "decklist": [
+                    "Sol Ring",
+                    "Arcane Signet",
+                    "Mind Stone",
+                    "Thought Vessel",
+                    "Hedron Archive",
+                ]
+                + ["Wastes"] * 35,
+                "num_games": 5,
+                "max_turns": 10,
+                "seed": 42,
+            }
+        }
+    )
 
 
 # ============================================================================
@@ -78,6 +140,20 @@ class CardRecommendation(BaseModel):
     cmc: float = Field(..., description="Mana value")
     type_line: Optional[str] = Field(default=None, description="Card type")
     reason: Optional[str] = Field(default=None, description="Why this card is recommended")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Deepglow Skate",
+                "synergy_score": 0.92,
+                "inclusion_rate": 0.78,
+                "category": "Finisher",
+                "cmc": 5.0,
+                "type_line": "Creature — Fish",
+                "reason": "Doubles counters on all permanents, synergizes with commander",
+            }
+        }
+    )
 
 
 class RecommendCardsResponse(BaseModel):
@@ -110,14 +186,10 @@ class DeckAnalysis(BaseModel):
     creature_count: int
 
     # Mana curve
-    cmc_distribution: dict[str, int] = Field(
-        ..., description="Cards at each CMC (0-7+)"
-    )
+    cmc_distribution: dict[str, int] = Field(..., description="Cards at each CMC (0-7+)")
 
     # Role distribution
-    role_distribution: dict[str, int] = Field(
-        ..., description="Cards in each role category"
-    )
+    role_distribution: dict[str, int] = Field(..., description="Cards in each role category")
 
     # Simulation results
     avg_damage: float = Field(..., description="Average damage dealt in goldfish")
@@ -196,9 +268,7 @@ class SimulateResponse(BaseModel):
     win_rate: float = Field(..., description="% of games dealing 40+ damage")
 
     # Per-turn breakdown
-    damage_by_turn: list[float] = Field(
-        ..., description="Average damage dealt on each turn"
-    )
+    damage_by_turn: list[float] = Field(..., description="Average damage dealt on each turn")
 
 
 class HealthResponse(BaseModel):
@@ -209,9 +279,29 @@ class HealthResponse(BaseModel):
     cards_loaded: int
     commanders_available: int
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "database_connected": True,
+                "cards_loaded": 36680,
+                "commanders_available": 47,
+            }
+        }
+    )
+
 
 class ErrorResponse(BaseModel):
     """Error response."""
 
     error: str
     detail: Optional[str] = None
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "error": "Not Found",
+                "detail": "Commander 'Invalid Name' not found",
+            }
+        }
+    )

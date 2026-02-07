@@ -96,8 +96,12 @@ result = sim.run_goldfish(deck, policy)
 uvicorn src.api.app:app --reload
 
 # API is available at http://localhost:8000
-# Docs at http://localhost:8000/docs
 ```
+
+**API Documentation:**
+- Swagger UI: http://localhost:8000/docs
+- ReDoc: http://localhost:8000/redoc
+- OpenAPI JSON: http://localhost:8000/openapi.json
 
 ```python
 import requests
@@ -108,6 +112,13 @@ response = requests.post("http://localhost:8000/recommend/cards", json={
     "count": 10
 })
 print(response.json()["recommendations"])
+
+# Analyze synergy between cards
+response = requests.post("http://localhost:8000/analyze/synergy", json={
+    "commander": "Atraxa, Praetors' Voice",
+    "cards": ["Deepglow Skate", "Doubling Season"]
+})
+print(response.json()["average_synergy"])
 ```
 
 ## Project Structure
@@ -132,7 +143,10 @@ manasink-ml/
 │   │   ├── state_encoder.py   # GameState → tensor
 │   │   ├── policy_network.py  # Neural network policy
 │   │   └── training.py        # PPO training loop
-│   └── api/               # FastAPI service (planned)
+│   └── api/               # FastAPI REST API
+│       ├── app.py         # FastAPI application
+│       ├── models.py      # Request/response schemas
+│       └── services.py    # Business logic
 ├── tests/
 ├── notebooks/             # Jupyter notebooks for exploration
 ├── data/
@@ -153,6 +167,13 @@ ruff check src/ tests/ --fix
 
 # Type checking
 mypy src/
+
+# Set up pre-commit hooks (recommended)
+pip install pre-commit
+pre-commit install
+
+# Run all hooks manually
+pre-commit run --all-files
 ```
 
 ## Roadmap
