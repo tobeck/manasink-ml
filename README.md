@@ -89,6 +89,27 @@ sim = Simulator(max_turns=15)
 result = sim.run_goldfish(deck, policy)
 ```
 
+### Run the API
+
+```bash
+# Start the API server
+uvicorn src.api.app:app --reload
+
+# API is available at http://localhost:8000
+# Docs at http://localhost:8000/docs
+```
+
+```python
+import requests
+
+# Get card recommendations
+response = requests.post("http://localhost:8000/recommend/cards", json={
+    "commander": "Atraxa, Praetors' Voice",
+    "count": 10
+})
+print(response.json()["recommendations"])
+```
+
 ## Project Structure
 
 ```
@@ -162,10 +183,14 @@ mypy src/
 - [ ] Self-play training (two agents)
 - [ ] Card synergy extraction from trained policies
 
-### Phase 4: API & Integration
-- [ ] FastAPI endpoints
+### Phase 4: API & Integration ✅
+- [x] FastAPI endpoints (health, recommend, analyze, simulate)
+- [x] Card recommendation API
+- [x] Deck analysis with simulation
+- [x] Synergy scoring API
 - [ ] Integration with main Manasink app
 - [ ] Recommendation caching
+- [ ] Model serving for trained policies
 
 ## License
 

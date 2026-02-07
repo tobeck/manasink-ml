@@ -180,12 +180,48 @@ result = load_deck_from_edhrec("Atraxa, Praetors' Voice")
 
 4. **Fast Iteration**: Prioritize simulation speed over rule completeness. We can refine rules later as we identify where simplifications hurt model quality.
 
+## API Server
+
+The FastAPI server provides the following endpoints:
+
+```bash
+# Start the server
+uvicorn src.api.app:app --reload --port 8000
+
+# Or using Python directly
+python -m src.api.app
+```
+
+**Endpoints:**
+- `GET  /health` - Health check with database status
+- `GET  /commanders` - List available commanders
+- `POST /recommend/cards` - Card recommendations for a commander
+- `POST /analyze/deck` - Deck analysis with simulation
+- `POST /analyze/synergy` - Synergy scores between cards
+- `POST /simulate/goldfish` - Run goldfish simulations
+
+**Example:**
+```python
+import requests
+
+# Get recommendations
+resp = requests.post("http://localhost:8000/recommend/cards", json={
+    "commander": "Atraxa, Praetors' Voice",
+    "count": 20,
+    "categories": ["Ramp", "Card Draw"]
+})
+
+# Analyze a deck
+resp = requests.post("http://localhost:8000/analyze/deck", json={
+    "commander": "Korvold, Fae-Cursed King",
+    "decklist": ["Sol Ring", "Arcane Signet", ...],
+    "num_simulations": 10
+})
+```
+
 ## Integration with Manasink App
 
-The main Manasink app (Next.js + Supabase) will call this service via API:
-- `POST /recommend/cards` - Given a commander, return recommended cards
-- `POST /analyze/deck` - Given a decklist, suggest cuts/additions
-- `POST /analyze/synergy` - Score card pairs for synergy
+The main Manasink app (Next.js + Supabase) will call this service via API.
 
 ## Related Resources
 
