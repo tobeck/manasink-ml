@@ -1,0 +1,161 @@
+# Manasink ML Docker Compose
+# Full stack for homelab deployment
+#
+# Usage:
+#   docker-compose up -d              # Start all services
+#   docker-compose logs -f api        # View API logs
+#   docker-compose exec api bash      # Shell into API container
+#   docker-compose down               # Stop all services
+#
+# First-time setup:
+#   docker-compose up -d postgres     # Start database
+#   docker-compose run --rm sync      # Sync Scryfall + EDHREC data
+#   docker-compose up -d              # Start all services
+
+services:
+  # ==========================================================================
+  # PostgreSQL Database
+  # ==========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: manasink-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-manasink}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-manasink}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Redis Cache (Optional)
+  # ==========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: manasink-redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================================================
+  # Manasink ML API
+  # ==========================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manasink-api
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-manasink}
+      REDIS_URL: redis://redis:6379
+      # API settings
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      LOG_LEVEL: info
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      # Traefik labels (if using Traefik as reverse proxy)
+      - "traefik.enable=true"
+      - "traefik.http.routers.manasink-api.rule=Host(`manasink-api.${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.manasink-api.entrypoints=websecure"
+      - "traefik.http.routers.manasink-api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.manasink-api.loadbalancer.server.port=8000"
+
+  # ==========================================================================
+  # Data Sync Worker (one-time or scheduled)
+  # ==========================================================================
+  sync:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manasink-sync
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-manasink}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Override command to run sync
+    command: >
+      sh -c "
+        echo 'Starting data sync...' &&
+        python -c 'from src.data import sync_database; sync_database(force=True)' &&
+        echo 'Scryfall sync complete.' &&
+        python -c 'from src.data import sync_edhrec_data; sync_edhrec_data(limit=100, force=True)' &&
+        echo 'EDHREC sync complete.' &&
+        python -c 'from src.data import populate_card_features; populate_card_features()' &&
+        echo 'Features extracted.' &&
+        python -c 'from src.data import populate_card_categories; populate_card_categories()' &&
+        echo 'Categories populated.' &&
+        echo 'All syncs complete!'
+      "
+    profiles:
+      - sync  # Only run with: docker-compose --profile sync run sync
+
+  # ==========================================================================
+  # Scheduled Sync (Optional - runs daily)
+  # ==========================================================================
+  sync-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: manasink-sync-scheduler
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-manasink}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Run sync daily at 3am
+    command: >
+      sh -c "
+        while true; do
+          echo 'Waiting for next sync window...' &&
+          sleep 86400 &&
+          echo 'Running scheduled sync...' &&
+          python -c 'from src.data import sync_database; sync_database()' &&
+          python -c 'from src.data import sync_edhrec_data; sync_edhrec_data(limit=100)' &&
+          echo 'Scheduled sync complete.'
+        done
+      "
+    profiles:
+      - scheduler  # Only run with: docker-compose --profile scheduler up -d
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+# ==========================================================================
+# Networks (optional - useful if integrating with other services)
+# ==========================================================================
+networks:
+  default:
+    name: manasink-network

@@ -176,6 +176,63 @@ pre-commit install
 pre-commit run --all-files
 ```
 
+## Docker Deployment
+
+The application can be deployed using Docker Compose with PostgreSQL.
+
+### Quick Start
+
+```bash
+# Copy environment file and customize
+cp .env.example .env
+# Edit .env with your settings
+
+# Start PostgreSQL
+docker-compose up -d postgres
+
+# Run initial data sync (downloads ~30MB, takes a few minutes)
+docker-compose --profile sync run --rm sync
+
+# Start the API
+docker-compose up -d api
+
+# View logs
+docker-compose logs -f api
+```
+
+The API will be available at http://localhost:8000
+
+### Services
+
+| Service | Description | Port |
+|---------|-------------|------|
+| `postgres` | PostgreSQL database | 5432 |
+| `redis` | Redis cache (optional) | 6379 |
+| `api` | FastAPI application | 8000 |
+| `sync` | Data sync worker | - |
+
+### Configuration
+
+Environment variables (set in `.env`):
+
+```bash
+# Database
+DB_USER=postgres
+DB_PASSWORD=your_password
+DB_NAME=manasink
+
+# Or use a full URL
+DATABASE_URL=postgresql://user:pass@host:5432/manasink
+```
+
+### With Traefik (for SSL)
+
+The compose file includes Traefik labels. Set your domain:
+
+```bash
+DOMAIN=yourdomain.com
+```
+
 ## Roadmap
 
 ### Phase 1: Goldfish Simulator ✅
@@ -185,11 +242,12 @@ pre-commit run --all-files
 - [x] Goldfish simulation mode
 
 ### Phase 1.5: Data Pipeline ✅
-- [x] SQLite card database with bulk ingestion
+- [x] SQLite/PostgreSQL card database with bulk ingestion
 - [x] EDHREC integration (recommendations, average decks)
 - [x] ML feature extraction (29-dim card vectors)
 - [x] Card role categorization
 - [x] Deck loading for simulation
+- [x] Docker deployment support
 
 ### Phase 2: Opponent Modeling (In Progress)
 - [x] Combat resolution (basic)

@@ -63,3 +63,8 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
