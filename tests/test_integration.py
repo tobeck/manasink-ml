@@ -12,24 +12,22 @@ import pytest
 import torch
 
 from src.game import (
-    Simulator,
+    ActionType,
+    Color,
     GreedyPolicy,
     RandomPolicy,
-    create_test_deck,
-    create_game,
-    Color,
-    get_legal_actions,
-    execute_action,
-    Action,
-    ActionType,
+    Simulator,
     SynergyAwarePolicy,
-    SynergyContext,
     create_empty_context,
+    create_game,
+    create_test_deck,
+    execute_action,
+    get_legal_actions,
 )
 from src.models import (
-    StateEncoder,
-    PolicyNetwork,
     NeuralPolicy,
+    PolicyNetwork,
+    StateEncoder,
     Trainer,
     TrainingConfig,
 )

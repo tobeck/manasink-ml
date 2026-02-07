@@ -4,13 +4,13 @@ Main game simulator with episode running and goldfish mode.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, Callable, TYPE_CHECKING
 import random
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from .card import Card, BASIC_LANDS, Color
-from .state import GameState, Player, Phase, create_game
-from .actions import Action, ActionType, get_legal_actions, execute_action
+from .actions import Action, ActionType, execute_action, get_legal_actions
+from .card import BASIC_LANDS, Card, Color
+from .state import GameState, create_game
 
 if TYPE_CHECKING:
     from .synergy_policy import SynergyBonus
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 class EpisodeResult:
     """Results from running a game episode."""
 
-    winner: Optional[int]  # Player index who won, None for draw
+    winner: int | None  # Player index who won, None for draw
     turns: int
     final_state: GameState
 
@@ -34,7 +34,7 @@ class EpisodeResult:
     history: list[dict] = field(default_factory=list)
 
     # Synergy bonuses for reward shaping (set by SynergyAwarePolicy)
-    synergy_bonuses: Optional["SynergyBonus"] = None
+    synergy_bonuses: SynergyBonus | None = None
 
 
 @dataclass
@@ -64,7 +64,7 @@ class Policy:
 class RandomPolicy(Policy):
     """Randomly selects from legal actions."""
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(self, seed: int | None = None):
         self.rng = random.Random(seed)
 
     def select_action(self, state: GameState, legal_actions: list[Action]) -> Action:
@@ -119,9 +119,9 @@ class Simulator:
         deck2: list[Card],
         policy1: Policy,
         policy2: Policy,
-        commander1: Optional[Card] = None,
-        commander2: Optional[Card] = None,
-        seed: Optional[int] = None,
+        commander1: Card | None = None,
+        commander2: Card | None = None,
+        seed: int | None = None,
     ) -> EpisodeResult:
         """
         Run a full game episode between two decks with given policies.
@@ -153,9 +153,9 @@ class Simulator:
             action = policy.select_action(state, legal_actions)
 
             if self.verbose:
-                print(
-                    f"Turn {state.turn_number} ({state.phase.name}): {state.active_player.name} -> {action}"
-                )
+                phase = state.phase.name
+                player = state.active_player.name
+                print(f"Turn {state.turn_number} ({phase}): {player} -> {action}")
 
             # Track metrics
             self._track_action(result, state.active_player_index, action)
@@ -185,8 +185,8 @@ class Simulator:
         self,
         deck: list[Card],
         policy: Policy,
-        commander: Optional[Card] = None,
-        seed: Optional[int] = None,
+        commander: Card | None = None,
+        seed: int | None = None,
         target_damage: int = 40,
     ) -> GoldfishResult:
         """
@@ -215,7 +215,6 @@ class Simulator:
 
         while state.turn_number <= self.max_turns:
             turn_start_life = state.players[1].life
-            turn_start_lands = len(state.players[0].lands)
 
             # Only player 0 takes meaningful turns
             if state.active_player_index == 0:
@@ -271,7 +270,7 @@ def create_test_deck(colors: set[Color], creature_count: int = 25) -> list[Card]
     Create a simple test deck with basic lands and vanilla creatures.
     Useful for testing the simulator.
     """
-    from .card import ManaCost, CardType
+    from .card import CardType, ManaCost
 
     deck = []
 
@@ -365,7 +364,7 @@ def test_goldfish():
 
     result = sim.run_goldfish(deck, policy, seed=42)
 
-    print(f"\n=== Goldfish Results ===")
+    print("\n=== Goldfish Results ===")
     print(f"Turns to kill: {result.turns_to_kill}")
     print(f"Total damage: {result.total_damage}")
     print(f"Cards played: {result.cards_played}")

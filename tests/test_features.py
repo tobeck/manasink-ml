@@ -3,13 +3,14 @@ Tests for card feature extraction.
 """
 
 import pytest
+
 from src.data.features import (
     CardFeatures,
-    extract_features_from_scryfall,
-    _parse_mana_cost,
-    _encode_keywords,
-    _encode_color_identity,
     _compute_role_scores,
+    _encode_color_identity,
+    _encode_keywords,
+    _parse_mana_cost,
+    extract_features_from_scryfall,
 )
 
 
@@ -192,7 +193,10 @@ class TestFeatureExtraction:
             "mana_cost": "{G}{W}{U}{B}",
             "cmc": 4,
             "type_line": "Legendary Creature — Phyrexian Angel Horror",
-            "oracle_text": "Flying, vigilance, deathtouch, lifelink\nAt the beginning of your end step, proliferate.",
+            "oracle_text": (
+                "Flying, vigilance, deathtouch, lifelink\n"
+                "At the beginning of your end step, proliferate."
+            ),
             "power": "4",
             "toughness": "4",
             "color_identity": ["W", "U", "B", "G"],

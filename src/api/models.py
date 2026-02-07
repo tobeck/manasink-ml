@@ -7,8 +7,8 @@ These models provide:
 - OpenAPI schema generation with examples for Swagger UI
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 # ============================================================================
 # Request Models
@@ -21,11 +21,11 @@ class RecommendCardsRequest(BaseModel):
     commander: str = Field(..., description="Commander name")
     count: int = Field(default=20, ge=1, le=100, description="Number of cards to recommend")
     exclude: list[str] = Field(default_factory=list, description="Cards to exclude")
-    budget: Optional[str] = Field(
+    budget: str | None = Field(
         default=None,
         description="Budget tier: 'budget', 'medium', 'high', or None for all",
     )
-    categories: Optional[list[str]] = Field(
+    categories: list[str] | None = Field(
         default=None,
         description="Filter by categories: 'Ramp', 'Card Draw', 'Removal', etc.",
     )
@@ -99,11 +99,11 @@ class SynergyRequest(BaseModel):
 class SimulateRequest(BaseModel):
     """Request for goldfish simulation."""
 
-    commander: Optional[str] = Field(default=None, description="Commander name (optional)")
+    commander: str | None = Field(default=None, description="Commander name (optional)")
     decklist: list[str] = Field(..., min_length=40, description="List of card names")
     num_games: int = Field(default=10, ge=1, le=100, description="Number of games to simulate")
     max_turns: int = Field(default=15, ge=1, le=30, description="Max turns per game")
-    seed: Optional[int] = Field(default=None, description="Random seed for reproducibility")
+    seed: int | None = Field(default=None, description="Random seed for reproducibility")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -136,10 +136,10 @@ class CardRecommendation(BaseModel):
     name: str
     synergy_score: float = Field(..., description="Synergy with commander (0-1)")
     inclusion_rate: float = Field(..., description="% of decks that include this card")
-    category: Optional[str] = Field(default=None, description="Card category/role")
+    category: str | None = Field(default=None, description="Card category/role")
     cmc: float = Field(..., description="Mana value")
-    type_line: Optional[str] = Field(default=None, description="Card type")
-    reason: Optional[str] = Field(default=None, description="Why this card is recommended")
+    type_line: str | None = Field(default=None, description="Card type")
+    reason: str | None = Field(default=None, description="Why this card is recommended")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -171,9 +171,9 @@ class CardPerformance(BaseModel):
     times_drawn: int
     times_played: int
     play_rate: float = Field(..., description="% of times played when drawn")
-    avg_turn_played: Optional[float] = Field(default=None, description="Average turn played")
+    avg_turn_played: float | None = Field(default=None, description="Average turn played")
     synergy_score: float = Field(default=0.0)
-    category: Optional[str] = None
+    category: str | None = None
 
 
 class DeckAnalysis(BaseModel):
@@ -226,7 +226,7 @@ class CardSynergy(BaseModel):
     card1: str
     card2: str
     synergy_score: float = Field(..., description="Combined synergy score")
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class SynergyResponse(BaseModel):
@@ -295,7 +295,7 @@ class ErrorResponse(BaseModel):
     """Error response."""
 
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None
 
     model_config = ConfigDict(
         json_schema_extra={

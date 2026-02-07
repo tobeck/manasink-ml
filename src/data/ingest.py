@@ -17,7 +17,6 @@ Or via CLI:
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 try:
     import requests
@@ -33,11 +32,9 @@ try:
 except ImportError:
     HAS_TQDM = False
 
-from sqlalchemy import text
 
 from .db_config import DatabaseConfig, DatabaseManager
 from .db_models import CardModel, SyncMetadata
-from .database import DEFAULT_DB_PATH
 
 SCRYFALL_API_BASE = "https://api.scryfall.com"
 DEFAULT_BULK_PATH = Path("data/raw/scryfall_bulk.json")
@@ -68,8 +65,8 @@ def get_bulk_data_info() -> dict:
 
 def needs_update(
     bulk_path: Path,
-    config: Optional[DatabaseConfig] = None,
-) -> tuple[bool, Optional[str]]:
+    config: DatabaseConfig | None = None,
+) -> tuple[bool, str | None]:
     """
     Check if we need to download new data.
 
@@ -108,7 +105,7 @@ def needs_update(
 
 
 def download_bulk_data(
-    output_path: Optional[Path] = None,
+    output_path: Path | None = None,
     show_progress: bool = True,
 ) -> Path:
     """
@@ -131,7 +128,7 @@ def download_bulk_data(
     download_url = info["download_uri"]
     file_size = info.get("size", 0)
 
-    print(f"Downloading Scryfall oracle cards data...")
+    print("Downloading Scryfall oracle cards data...")
     print(f"  URL: {download_url}")
     print(f"  Size: {file_size / 1024 / 1024:.1f} MB")
 
@@ -165,9 +162,9 @@ def download_bulk_data(
 
 
 def populate_database(
-    bulk_path: Optional[Path] = None,
-    config: Optional[DatabaseConfig] = None,
-    scryfall_updated_at: Optional[str] = None,
+    bulk_path: Path | None = None,
+    config: DatabaseConfig | None = None,
+    scryfall_updated_at: str | None = None,
     show_progress: bool = True,
     drop_existing: bool = True,
 ) -> int:
@@ -252,7 +249,7 @@ def populate_database(
     return inserted
 
 
-def _extract_card_model(card_data: dict) -> Optional[CardModel]:
+def _extract_card_model(card_data: dict) -> CardModel | None:
     """Extract CardModel from Scryfall card data."""
     try:
         scryfall_id = card_data.get("id")
@@ -311,8 +308,8 @@ def _extract_card_model(card_data: dict) -> Optional[CardModel]:
 
 
 def sync_database(
-    bulk_path: Optional[Path] = None,
-    config: Optional[DatabaseConfig] = None,
+    bulk_path: Path | None = None,
+    config: DatabaseConfig | None = None,
     force: bool = False,
     show_progress: bool = True,
 ) -> dict:
@@ -363,13 +360,13 @@ def sync_database(
     )
     result["cards_inserted"] = cards
 
-    print(f"\nSync complete!")
+    print("\nSync complete!")
     print(f"  Cards: {cards}")
 
     return result
 
 
-def get_database_stats(config: Optional[DatabaseConfig] = None) -> dict:
+def get_database_stats(config: DatabaseConfig | None = None) -> dict:
     """
     Get statistics about the card database.
 
@@ -387,13 +384,13 @@ def get_database_stats(config: Optional[DatabaseConfig] = None) -> dict:
 
         # Commander-legal cards
         stats["commander_legal"] = (
-            session.query(CardModel).filter(CardModel.legal_commander == True).count()
+            session.query(CardModel).filter(CardModel.legal_commander.is_(True)).count()
         )
 
         # Potential commanders
         stats["commanders"] = (
             session.query(CardModel)
-            .filter(CardModel.is_commander == True, CardModel.legal_commander == True)
+            .filter(CardModel.is_commander.is_(True), CardModel.legal_commander.is_(True))
             .count()
         )
 

@@ -3,26 +3,24 @@ Basic tests for the game simulator.
 """
 
 import pytest
+
 from src.game import (
+    BASIC_LANDS,
+    ActionType,
     Card,
-    ManaCost,
-    ManaPool,
     CardType,
     Color,
-    GameState,
-    Player,
+    GreedyPolicy,
+    ManaCost,
+    ManaPool,
     Permanent,
     Phase,
-    Action,
-    ActionType,
-    get_legal_actions,
-    execute_action,
-    Simulator,
-    GreedyPolicy,
     RandomPolicy,
-    create_test_deck,
+    Simulator,
     create_game,
-    BASIC_LANDS,
+    create_test_deck,
+    execute_action,
+    get_legal_actions,
 )
 
 

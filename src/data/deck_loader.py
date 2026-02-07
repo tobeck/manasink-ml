@@ -13,11 +13,11 @@ Features:
 """
 
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from src.game.card import Card, Color, CardType
+from src.game.card import Card, CardType, Color
+
 from .database import DEFAULT_DB_PATH, CardDatabase
 
 
@@ -65,8 +65,8 @@ class SynergyData:
 
 def load_deck_from_edhrec(
     commander_name: str,
-    db_path: Optional[Path] = None,
-) -> Optional[DeckLoadResult]:
+    db_path: Path | None = None,
+) -> DeckLoadResult | None:
     """
     Load a deck from EDHREC average deck data.
 
@@ -155,8 +155,8 @@ def load_deck_from_edhrec(
 
 def load_synergy_data(
     commander_name: str,
-    db_path: Optional[Path] = None,
-) -> Optional[SynergyData]:
+    db_path: Path | None = None,
+) -> SynergyData | None:
     """
     Load synergy data for a commander's recommended cards.
 
@@ -222,8 +222,8 @@ def load_synergy_data(
 
 def load_deck_with_synergy_data(
     commander_name: str,
-    db_path: Optional[Path] = None,
-) -> tuple[Optional[DeckLoadResult], Optional[SynergyData]]:
+    db_path: Path | None = None,
+) -> tuple[DeckLoadResult | None, SynergyData | None]:
     """
     Load both deck and synergy data for a commander.
 
@@ -241,9 +241,9 @@ def load_deck_with_synergy_data(
 
 
 def list_available_commanders(
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     min_decks: int = 100,
-    color_identity: Optional[str] = None,
+    color_identity: str | None = None,
     limit: int = 100,
 ) -> list[dict]:
     """

@@ -19,19 +19,18 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Optional
 
-from .database import CardDatabase, DEFAULT_DB_PATH
-from .ingest import sync_database, get_database_stats, DEFAULT_BULK_PATH
+from .categories import get_categories_stats, populate_card_categories
+from .database import DEFAULT_DB_PATH, CardDatabase
 from .edhrec_ingest import (
-    sync_edhrec_data,
-    get_edhrec_stats,
-    get_commander_recommendations,
-    get_salt_scores_from_db,
     estimate_deck_power,
+    get_commander_recommendations,
+    get_edhrec_stats,
+    get_salt_scores_from_db,
+    sync_edhrec_data,
 )
-from .features import populate_card_features, get_features_stats
-from .categories import populate_card_categories, get_categories_stats
+from .features import get_features_stats, populate_card_features
+from .ingest import DEFAULT_BULK_PATH, get_database_stats, sync_database
 
 
 def cmd_sync(args: argparse.Namespace) -> int:
@@ -53,7 +52,7 @@ def cmd_sync(args: argparse.Namespace) -> int:
         if result["skipped"]:
             return 0
 
-        print(f"\nSync completed successfully!")
+        print("\nSync completed successfully!")
         return 0
 
     except Exception as e:
@@ -262,7 +261,7 @@ def cmd_edhrec_sync(args: argparse.Namespace) -> int:
         if result.get("skipped"):
             return 0
 
-        print(f"\nEDHREC sync completed successfully!")
+        print("\nEDHREC sync completed successfully!")
         return 0
 
     except Exception as e:
@@ -538,7 +537,7 @@ def cmd_edhrec_power(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: Optional[list[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     """Main entry point for the CLI."""
     parser = argparse.ArgumentParser(
         prog="manasink-data",

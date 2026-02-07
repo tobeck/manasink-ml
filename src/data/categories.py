@@ -12,12 +12,10 @@ The aggregated data is useful for:
 - Building deck composition heuristics
 """
 
-import json
 import re
 import sqlite3
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 try:
     from tqdm import tqdm
@@ -122,7 +120,7 @@ class CardCategoryInfo:
     categories: dict[str, dict]  # category -> {occurrences, commanders, avg_synergy, avg_inclusion}
 
     @property
-    def primary_category(self) -> Optional[str]:
+    def primary_category(self) -> str | None:
         """Return the most common category for this card."""
         if not self.categories:
             return None
@@ -158,7 +156,7 @@ def normalize_category(category: str) -> str:
 
 
 def populate_card_categories(
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     show_progress: bool = True,
 ) -> int:
     """
@@ -255,8 +253,8 @@ def populate_card_categories(
 def compute_role_scores(
     card_name: str,
     oracle_text: str,
-    categories: Optional[list[dict]] = None,
-    db_path: Optional[Path] = None,
+    categories: list[dict] | None = None,
+    db_path: Path | None = None,
 ) -> dict[str, float]:
     """
     Compute role scores for a card based on categories and oracle text.
@@ -309,7 +307,7 @@ def compute_role_scores(
 
 def get_card_categories(
     card_name: str,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> list[dict]:
     """
     Get all categories for a card.
@@ -357,7 +355,7 @@ def get_card_categories(
 
 def get_cards_by_category(
     category: str,
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     limit: int = 100,
     min_commander_count: int = 1,
 ) -> list[dict]:
@@ -413,7 +411,7 @@ def get_cards_by_category(
 
 
 def get_top_cards_per_role(
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     top_n: int = 10,
 ) -> dict[str, list[dict]]:
     """
@@ -440,7 +438,7 @@ def get_top_cards_per_role(
     return result
 
 
-def get_categories_stats(db_path: Optional[Path] = None) -> dict:
+def get_categories_stats(db_path: Path | None = None) -> dict:
     """Get statistics about the card_categories table."""
     db_path = db_path or DEFAULT_DB_PATH
 

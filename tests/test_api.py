@@ -8,12 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api import app
-from src.api.models import (
-    RecommendCardsRequest,
-    AnalyzeDeckRequest,
-    SynergyRequest,
-    SimulateRequest,
-)
 from src.api.services import get_health_status
 
 # Create test client
@@ -155,7 +149,7 @@ class TestAnalyzeDeckEndpoint:
         commander = commanders_response.json()["commanders"][0]["name"]
 
         # Create a minimal deck
-        decklist = ["Sol Ring", "Arcane Signet", "Command Tower"] + [f"Forest" for _ in range(40)]
+        decklist = ["Sol Ring", "Arcane Signet", "Command Tower"] + ["Forest" for _ in range(40)]
 
         response = client.post(
             "/analyze/deck",

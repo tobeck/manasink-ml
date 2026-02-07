@@ -18,25 +18,18 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
-from sqlalchemy import func, or_, and_, text
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
-from src.game.card import Card, CardType, Color
+from src.game.card import Card, Color
 
-from .db_config import DatabaseConfig, DatabaseManager, get_db_session
+from .db_config import DatabaseConfig, DatabaseManager
 from .db_models import (
-    Base,
     CardModel,
+)
+from .db_models import (
     SyncMetadata as SyncMetadataModel,
-    CommanderModel,
-    CommanderRecommendation,
-    AverageDeckCard,
-    CardSaltScore,
-    EDHRecSyncMetadata,
-    CardFeatureModel,
-    CardCategory,
 )
 
 # Default database path (for backwards compatibility)
@@ -47,9 +40,9 @@ DEFAULT_DB_PATH = Path("data/cards.db")
 class SyncMetadata:
     """Metadata about the last database sync."""
 
-    last_updated: Optional[datetime]
+    last_updated: datetime | None
     card_count: int
-    scryfall_updated_at: Optional[str]
+    scryfall_updated_at: str | None
 
 
 class CardDatabase:
@@ -68,8 +61,8 @@ class CardDatabase:
 
     def __init__(
         self,
-        db_path: Optional[Path] = None,
-        config: Optional[DatabaseConfig] = None,
+        db_path: Path | None = None,
+        config: DatabaseConfig | None = None,
     ):
         """
         Initialize the database connection.
@@ -87,7 +80,7 @@ class CardDatabase:
             # Use environment configuration
             self._manager = DatabaseManager()
 
-        self._session: Optional[Session] = None
+        self._session: Session | None = None
 
     def _get_session(self) -> Session:
         """Get or create database session."""
@@ -111,7 +104,7 @@ class CardDatabase:
     # Query Methods
     # -------------------------------------------------------------------------
 
-    def get_card(self, name: str) -> Optional[Card]:
+    def get_card(self, name: str) -> Card | None:
         """
         Get a card by exact name.
 
@@ -127,7 +120,7 @@ class CardDatabase:
             return Card.from_scryfall(json.loads(result.scryfall_json))
         return None
 
-    def get_card_by_id(self, scryfall_id: str) -> Optional[Card]:
+    def get_card_by_id(self, scryfall_id: str) -> Card | None:
         """Get a card by Scryfall ID."""
         session = self._get_session()
         result = session.query(CardModel).filter(CardModel.scryfall_id == scryfall_id).first()
@@ -138,15 +131,15 @@ class CardDatabase:
     def search(
         self,
         *,
-        name_contains: Optional[str] = None,
-        card_types: Optional[list[str]] = None,
-        colors: Optional[str] = None,
-        color_identity: Optional[str] = None,
-        min_cmc: Optional[int] = None,
-        max_cmc: Optional[int] = None,
-        is_commander: Optional[bool] = None,
-        is_legal_commander: Optional[bool] = None,
-        text_contains: Optional[str] = None,
+        name_contains: str | None = None,
+        card_types: list[str] | None = None,
+        colors: str | None = None,
+        color_identity: str | None = None,
+        min_cmc: int | None = None,
+        max_cmc: int | None = None,
+        is_commander: bool | None = None,
+        is_legal_commander: bool | None = None,
+        text_contains: str | None = None,
         limit: int = 100,
     ) -> list[Card]:
         """
@@ -208,8 +201,8 @@ class CardDatabase:
 
     def get_commanders(
         self,
-        colors: Optional[str] = None,
-        max_cmc: Optional[int] = None,
+        colors: str | None = None,
+        max_cmc: int | None = None,
         limit: int = 100,
     ) -> list[Card]:
         """
@@ -234,9 +227,9 @@ class CardDatabase:
     def get_cards_for_commander(
         self,
         commander: Card,
-        card_types: Optional[list[str]] = None,
-        max_cmc: Optional[int] = None,
-        text_contains: Optional[str] = None,
+        card_types: list[str] | None = None,
+        max_cmc: int | None = None,
+        text_contains: str | None = None,
         limit: int = 100,
     ) -> list[Card]:
         """
@@ -264,11 +257,11 @@ class CardDatabase:
         )
 
     def get_random_cards(
-        self, count: int = 10, card_types: Optional[list[str]] = None
+        self, count: int = 10, card_types: list[str] | None = None
     ) -> list[Card]:
         """Get random cards, optionally filtered by type."""
         session = self._get_session()
-        query = session.query(CardModel).filter(CardModel.legal_commander == True)
+        query = session.query(CardModel).filter(CardModel.legal_commander.is_(True))
 
         if card_types:
             type_filters = [CardModel.type_line.ilike(f"%{ct.lower()}%") for ct in card_types]
@@ -312,7 +305,7 @@ class CardDatabase:
         session = self._get_session()
         return session.query(func.count(CardModel.id)).scalar() or 0
 
-    def get_scryfall_json(self, name: str) -> Optional[dict]:
+    def get_scryfall_json(self, name: str) -> dict | None:
         """Get the raw Scryfall JSON for a card (useful for debugging)."""
         session = self._get_session()
         result = (
@@ -330,7 +323,7 @@ class CardDatabase:
 # -----------------------------------------------------------------------------
 
 
-def create_schema(db_path: Optional[Path] = None, config: Optional[DatabaseConfig] = None):
+def create_schema(db_path: Path | None = None, config: DatabaseConfig | None = None):
     """
     Create the database schema.
 
@@ -348,7 +341,7 @@ def create_schema(db_path: Optional[Path] = None, config: Optional[DatabaseConfi
     return manager
 
 
-def create_edhrec_schema(db_path: Optional[Path] = None, config: Optional[DatabaseConfig] = None):
+def create_edhrec_schema(db_path: Path | None = None, config: DatabaseConfig | None = None):
     """
     Create the EDHREC-related database tables.
 
@@ -358,7 +351,7 @@ def create_edhrec_schema(db_path: Optional[Path] = None, config: Optional[Databa
     return create_schema(db_path, config)
 
 
-def create_features_schema(db_path: Optional[Path] = None, config: Optional[DatabaseConfig] = None):
+def create_features_schema(db_path: Path | None = None, config: DatabaseConfig | None = None):
     """
     Create the card features database table.
 
@@ -369,7 +362,7 @@ def create_features_schema(db_path: Optional[Path] = None, config: Optional[Data
 
 
 def create_categories_schema(
-    db_path: Optional[Path] = None, config: Optional[DatabaseConfig] = None
+    db_path: Path | None = None, config: DatabaseConfig | None = None
 ):
     """
     Create the card categories database table.

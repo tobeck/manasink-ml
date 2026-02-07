@@ -18,14 +18,15 @@ Design decisions:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import torch
 
 if TYPE_CHECKING:
-    from src.game.state import GameState
-    from src.game.card import Card
+    from src.data.features import CardFeatures
     from src.game.actions import Action
+    from src.game.card import Card
+    from src.game.state import GameState
 
 
 # Card encoding dimension (matches CardFeatures.vector_size())
@@ -58,7 +59,7 @@ class EncodedState:
     battlefield_mask: torch.Tensor  # (max_battlefield,)
     opponent_battlefield_mask: torch.Tensor  # (max_battlefield,)
 
-    def to(self, device: torch.device) -> "EncodedState":
+    def to(self, device: torch.device) -> EncodedState:
         """Move all tensors to the specified device."""
         return EncodedState(
             hand=self.hand.to(device),
@@ -113,7 +114,7 @@ class StateEncoder:
         opponent_dim = self.max_battlefield * self.card_dim
         return hand_dim + battlefield_dim + opponent_dim + GLOBAL_FEATURE_DIM
 
-    def encode_state(self, state: "GameState") -> EncodedState:
+    def encode_state(self, state: GameState) -> EncodedState:
         """
         Encode a GameState into tensors.
 
@@ -160,7 +161,7 @@ class StateEncoder:
             opponent_battlefield_mask=opp_mask,
         )
 
-    def encode_card(self, card: "Card") -> torch.Tensor:
+    def encode_card(self, card: Card) -> torch.Tensor:
         """
         Encode a single card as a feature vector.
 
@@ -192,8 +193,8 @@ class StateEncoder:
 
     def encode_action(
         self,
-        action: "Action",
-        legal_actions: list["Action"],
+        action: Action,
+        legal_actions: list[Action],
     ) -> int:
         """
         Encode an action as an index into the action space.
@@ -212,7 +213,7 @@ class StateEncoder:
 
     def _encode_card_zone(
         self,
-        cards: list["Card"],
+        cards: list[Card],
         max_size: int,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
@@ -246,7 +247,7 @@ class StateEncoder:
 
         return zone_tensor, mask
 
-    def _encode_global_features(self, state: "GameState") -> torch.Tensor:
+    def _encode_global_features(self, state: GameState) -> torch.Tensor:
         """
         Encode global game state features.
 
@@ -293,13 +294,13 @@ class StateEncoder:
 
         return torch.tensor(features, dtype=torch.float32)
 
-    def _encode_card_basic(self, card: "Card") -> torch.Tensor:
+    def _encode_card_basic(self, card: Card) -> torch.Tensor:
         """
         Basic card encoding from card properties when database features unavailable.
 
         Encodes to match CardFeatures.vector_size() = 29 dimensions.
         """
-        from src.game.card import Color, CardType
+        from src.game.card import CardType, Color
 
         features = []
 
@@ -343,7 +344,7 @@ class StateEncoder:
         assert len(features) == CARD_FEATURE_DIM
         return torch.tensor(features, dtype=torch.float32)
 
-    def _get_card_features(self, card: "Card") -> Optional["CardFeatures"]:
+    def _get_card_features(self, card: Card) -> CardFeatures | None:
         """
         Try to get CardFeatures from the database.
 
@@ -359,7 +360,7 @@ class StateEncoder:
 
 def batch_encode_states(
     encoder: StateEncoder,
-    states: list["GameState"],
+    states: list[GameState],
 ) -> dict[str, torch.Tensor]:
     """
     Encode multiple states into batched tensors.

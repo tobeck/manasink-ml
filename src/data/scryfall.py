@@ -2,11 +2,10 @@
 Scryfall API client for fetching card data.
 """
 
+import hashlib
 import json
 import time
 from pathlib import Path
-from typing import Optional
-import hashlib
 
 # Note: requests is imported conditionally to allow the module to load without it
 try:
@@ -27,7 +26,7 @@ class ScryfallClient:
     Client for the Scryfall API with caching support.
     """
 
-    def __init__(self, cache_dir: Optional[Path] = None, rate_limit_ms: int = 100):
+    def __init__(self, cache_dir: Path | None = None, rate_limit_ms: int = 100):
         if not HAS_REQUESTS:
             raise ImportError("requests library required for ScryfallClient")
 
@@ -49,7 +48,7 @@ class ScryfallClient:
         hash_key = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{hash_key}.json"
 
-    def _get_cached(self, key: str) -> Optional[dict]:
+    def _get_cached(self, key: str) -> dict | None:
         """Get cached response if available."""
         cache_path = self._get_cache_path(key)
         if cache_path.exists():
@@ -63,7 +62,7 @@ class ScryfallClient:
         with open(cache_path, "w") as f:
             json.dump(data, f)
 
-    def get_card_by_name(self, name: str, fuzzy: bool = False) -> Optional[Card]:
+    def get_card_by_name(self, name: str, fuzzy: bool = False) -> Card | None:
         """
         Fetch a card by name.
 
@@ -99,7 +98,7 @@ class ScryfallClient:
         self._set_cached(cache_key, data)
         return Card.from_scryfall(data)
 
-    def get_card_by_id(self, scryfall_id: str) -> Optional[Card]:
+    def get_card_by_id(self, scryfall_id: str) -> Card | None:
         """Fetch a card by Scryfall ID."""
         cache_key = f"card_id:{scryfall_id}"
         cached = self._get_cached(cache_key)
@@ -174,7 +173,7 @@ class ScryfallClient:
 
     def get_commanders(
         self,
-        colors: Optional[str] = None,
+        colors: str | None = None,
         max_results: int = 100,
     ) -> list[Card]:
         """
@@ -196,8 +195,8 @@ class ScryfallClient:
     def get_cards_for_commander(
         self,
         commander: Card,
-        card_type: Optional[str] = None,
-        max_cmc: Optional[int] = None,
+        card_type: str | None = None,
+        max_cmc: int | None = None,
         max_results: int = 100,
     ) -> list[Card]:
         """
@@ -228,7 +227,7 @@ class ScryfallClient:
         return self.search_cards(query, max_results=max_results)
 
 
-def download_bulk_data(output_path: Optional[Path] = None) -> Path:
+def download_bulk_data(output_path: Path | None = None) -> Path:
     """
     Download Scryfall's bulk data file.
     This is more efficient for large-scale processing.
@@ -271,7 +270,7 @@ def download_bulk_data(output_path: Optional[Path] = None) -> Path:
     return output_path
 
 
-def load_bulk_data(path: Optional[Path] = None) -> dict[str, Card]:
+def load_bulk_data(path: Path | None = None) -> dict[str, Card]:
     """
     Load cards from bulk data file.
 
@@ -291,7 +290,7 @@ def load_bulk_data(path: Optional[Path] = None) -> dict[str, Card]:
         try:
             card = Card.from_scryfall(card_data)
             cards[card.name] = card
-        except Exception as e:
+        except Exception:
             # Skip cards that fail to parse
             pass
 
@@ -301,13 +300,13 @@ def load_bulk_data(path: Optional[Path] = None) -> dict[str, Card]:
 # Convenience functions
 
 
-def fetch_card(name: str) -> Optional[Card]:
+def fetch_card(name: str) -> Card | None:
     """Quick helper to fetch a single card by name."""
     client = ScryfallClient()
     return client.get_card_by_name(name, fuzzy=True)
 
 
-def fetch_commander(name: str) -> Optional[Card]:
+def fetch_commander(name: str) -> Card | None:
     """Fetch a commander by name and validate it's legal as a commander."""
     card = fetch_card(name)
     if card and card.is_commander:

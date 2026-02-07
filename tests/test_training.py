@@ -11,23 +11,22 @@ import pytest
 import torch
 
 from src.game import (
-    create_game,
-    create_test_deck,
-    Color,
-    get_legal_actions,
-    execute_action,
     Action,
     ActionType,
+    Color,
+    create_game,
+    create_test_deck,
+    get_legal_actions,
 )
 from src.models import (
-    StateEncoder,
-    EncodedState,
-    PolicyNetwork,
-    NeuralPolicy,
-    Trainer,
-    TrainingConfig,
     CARD_FEATURE_DIM,
     GLOBAL_FEATURE_DIM,
+    EncodedState,
+    NeuralPolicy,
+    PolicyNetwork,
+    StateEncoder,
+    Trainer,
+    TrainingConfig,
 )
 
 

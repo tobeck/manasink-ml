@@ -6,12 +6,13 @@ Tests that don't require database are marked accordingly.
 """
 
 import pytest
+
 from src.data.deck_loader import (
     DeckLoadResult,
     SynergyData,
     get_deck_stats,
 )
-from src.game import Card, ManaCost, CardType, Color
+from src.game import Card, CardType, Color, ManaCost
 
 
 class TestDeckLoadResult:

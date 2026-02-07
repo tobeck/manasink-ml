@@ -31,24 +31,24 @@ Quick start:
     policy = trainer.get_policy()
 """
 
+from .policy_network import (
+    CardSetEncoder,
+    NeuralPolicy,
+    PolicyNetwork,
+)
 from .state_encoder import (
-    StateEncoder,
-    EncodedState,
-    batch_encode_states,
     CARD_FEATURE_DIM,
     GLOBAL_FEATURE_DIM,
-)
-from .policy_network import (
-    PolicyNetwork,
-    NeuralPolicy,
-    CardSetEncoder,
+    EncodedState,
+    StateEncoder,
+    batch_encode_states,
 )
 from .training import (
+    Experience,
+    ExperienceBuffer,
     Trainer,
     TrainingConfig,
     TrainingMetrics,
-    Experience,
-    ExperienceBuffer,
     create_trainer,
 )
 

@@ -42,51 +42,51 @@ Quick start:
     recs = get_commander_recommendations("Atraxa, Praetors' Voice")
 """
 
-from .db_config import DatabaseConfig, DatabaseManager, get_db_session
-from .scryfall import (
-    ScryfallClient,
-    fetch_card,
-    fetch_commander,
+from .categories import (
+    compute_role_scores,
+    get_card_categories,
+    get_cards_by_category,
+    get_categories_stats,
+    get_top_cards_per_role,
+    populate_card_categories,
 )
 from .database import CardDatabase
-from .ingest import sync_database, get_database_stats
+from .db_config import DatabaseConfig, DatabaseManager, get_db_session
+from .deck_loader import (
+    DeckLoadResult,
+    SynergyData,
+    get_deck_stats,
+    list_available_commanders,
+    load_deck_from_edhrec,
+    load_deck_with_synergy_data,
+    load_synergy_data,
+)
 from .edhrec import (
     EDHRecClient,
     fetch_commander_recommendations,
     fetch_salt_scores,
 )
 from .edhrec_ingest import (
-    sync_edhrec_data,
-    get_edhrec_stats,
-    get_commander_recommendations,
-    get_salt_scores_from_db,
-    estimate_deck_power,
     PowerLevelEstimate,
+    estimate_deck_power,
+    get_commander_recommendations,
+    get_edhrec_stats,
+    get_salt_scores_from_db,
+    sync_edhrec_data,
 )
 from .features import (
     CardFeatures,
     extract_features_from_scryfall,
-    populate_card_features,
-    get_feature_vector,
     get_batch_features,
+    get_feature_vector,
     get_features_stats,
+    populate_card_features,
 )
-from .categories import (
-    populate_card_categories,
-    compute_role_scores,
-    get_card_categories,
-    get_cards_by_category,
-    get_top_cards_per_role,
-    get_categories_stats,
-)
-from .deck_loader import (
-    DeckLoadResult,
-    SynergyData,
-    load_deck_from_edhrec,
-    load_synergy_data,
-    load_deck_with_synergy_data,
-    list_available_commanders,
-    get_deck_stats,
+from .ingest import get_database_stats, sync_database
+from .scryfall import (
+    ScryfallClient,
+    fetch_card,
+    fetch_commander,
 )
 
 __all__ = [

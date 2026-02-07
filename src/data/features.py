@@ -17,9 +17,8 @@ Key features extracted:
 import json
 import re
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 try:
     from tqdm import tqdm
@@ -166,8 +165,8 @@ class CardFeatures:
     keyword_bitmap: int = 0
 
     # Creature stats
-    power: Optional[int] = None
-    toughness: Optional[int] = None
+    power: int | None = None
+    toughness: int | None = None
 
     # Color identity (5-bit WUBRG)
     color_identity_bitmap: int = 0
@@ -245,9 +244,7 @@ def _parse_mana_cost(mana_cost: str) -> tuple[int, int, int, int, int, int]:
     for match in generic_match:
         c += int(match)
 
-    # Also handle X costs
-    x_count = mana_cost.count("X")
-    # X is treated as 0 for feature purposes
+    # X costs are treated as 0 for feature purposes
 
     return (w, u, b, r, g, c)
 
@@ -401,7 +398,7 @@ def extract_features_from_scryfall(card_data: dict) -> CardFeatures:
 
 
 def populate_card_features(
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
     batch_size: int = 1000,
     show_progress: bool = True,
 ) -> int:
@@ -452,7 +449,7 @@ def populate_card_features(
                 card_data = json.loads(row["scryfall_json"])
                 features = extract_features_from_scryfall(card_data)
                 batch.append(features)
-            except (json.JSONDecodeError, Exception) as e:
+            except (json.JSONDecodeError, Exception):
                 continue
 
         # Insert batch
@@ -465,7 +462,8 @@ def populate_card_features(
                  is_planeswalker, is_land, is_legendary, keyword_bitmap, power, toughness,
                  color_identity_bitmap, role_ramp, role_card_draw, role_removal,
                  role_board_wipe, role_protection, role_finisher, role_utility)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     f.scryfall_id,
@@ -516,8 +514,8 @@ def populate_card_features(
 
 def get_feature_vector(
     card_name: str,
-    db_path: Optional[Path] = None,
-) -> Optional[CardFeatures]:
+    db_path: Path | None = None,
+) -> CardFeatures | None:
     """
     Get features for a single card by name.
 
@@ -580,7 +578,7 @@ def get_feature_vector(
 
 def get_batch_features(
     card_names: list[str],
-    db_path: Optional[Path] = None,
+    db_path: Path | None = None,
 ) -> dict[str, CardFeatures]:
     """
     Get features for multiple cards by name.
@@ -645,7 +643,7 @@ def get_batch_features(
     return result
 
 
-def get_features_stats(db_path: Optional[Path] = None) -> dict:
+def get_features_stats(db_path: Path | None = None) -> dict:
     """Get statistics about the card_features table."""
     db_path = db_path or DEFAULT_DB_PATH
 

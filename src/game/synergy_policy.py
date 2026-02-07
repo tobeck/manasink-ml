@@ -16,12 +16,10 @@ This is useful for:
 
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
 
-from .card import Card
-from .state import GameState
 from .actions import Action, ActionType
 from .simulator import Policy
+from .state import GameState
 
 
 @dataclass
@@ -282,8 +280,8 @@ class SynergyAwarePolicy(Policy):
 
 def load_synergy_context(
     commander_name: str,
-    db_path: Optional[Path] = None,
-) -> Optional[SynergyContext]:
+    db_path: Path | None = None,
+) -> SynergyContext | None:
     """
     Load synergy context for a commander from the database.
 
@@ -295,7 +293,7 @@ def load_synergy_context(
         SynergyContext or None if not found
     """
     # Import here to avoid circular imports
-    from src.data.deck_loader import load_synergy_data, DEFAULT_DB_PATH
+    from src.data.deck_loader import DEFAULT_DB_PATH, load_synergy_data
 
     db_path = db_path or DEFAULT_DB_PATH
 

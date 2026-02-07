@@ -18,22 +18,22 @@ Design decisions:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F  # noqa: N812
 
 from .state_encoder import (
-    EncodedState,
-    StateEncoder,
     CARD_FEATURE_DIM,
     GLOBAL_FEATURE_DIM,
+    EncodedState,
+    StateEncoder,
 )
 
 if TYPE_CHECKING:
-    from src.game.state import GameState
     from src.game.actions import Action
+    from src.game.state import GameState
 
 
 # Default architecture hyperparameters
@@ -175,7 +175,7 @@ class PolicyNetwork(nn.Module):
     def forward(
         self,
         state: EncodedState,
-        action_mask: Optional[torch.Tensor] = None,
+        action_mask: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Forward pass through the network.
@@ -247,7 +247,7 @@ class PolicyNetwork(nn.Module):
     def get_action_probs(
         self,
         state: EncodedState,
-        action_mask: Optional[torch.Tensor] = None,
+        action_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """
         Get action probabilities (softmax of logits).
@@ -284,7 +284,7 @@ class NeuralPolicy:
         self,
         network: PolicyNetwork,
         encoder: StateEncoder,
-        device: Optional[torch.device] = None,
+        device: torch.device | None = None,
         temperature: float = 1.0,
         deterministic: bool = False,
     ):
@@ -309,9 +309,9 @@ class NeuralPolicy:
 
     def select_action(
         self,
-        state: "GameState",
-        legal_actions: list["Action"],
-    ) -> "Action":
+        state: GameState,
+        legal_actions: list[Action],
+    ) -> Action:
         """
         Select an action given the game state and legal actions.
 
@@ -363,9 +363,9 @@ class NeuralPolicy:
 
     def get_action_and_value(
         self,
-        state: "GameState",
-        legal_actions: list["Action"],
-    ) -> tuple["Action", float, float, torch.Tensor]:
+        state: GameState,
+        legal_actions: list[Action],
+    ) -> tuple[Action, float, float, torch.Tensor]:
         """
         Get action, value, log probability, and entropy for training.
 
@@ -463,7 +463,7 @@ class NeuralPolicy:
 
         return log_probs, values.squeeze(-1), entropy
 
-    def _create_action_mask(self, legal_actions: list["Action"]) -> torch.Tensor:
+    def _create_action_mask(self, legal_actions: list[Action]) -> torch.Tensor:
         """
         Create an action mask tensor.
 

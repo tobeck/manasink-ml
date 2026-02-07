@@ -8,12 +8,11 @@ EDHREC provides:
 - Salt scores for power level estimation
 """
 
+import hashlib
 import json
 import re
 import time
 from pathlib import Path
-from typing import Optional
-import hashlib
 
 try:
     import requests
@@ -28,7 +27,10 @@ DEFAULT_CACHE_DIR = Path("data/raw/edhrec_cache")
 
 # Headers to mimic browser requests (EDHREC blocks bare requests)
 DEFAULT_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    ),
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
     "Referer": "https://edhrec.com/",
@@ -88,7 +90,7 @@ class EDHRecClient:
 
     def __init__(
         self,
-        cache_dir: Optional[Path] = None,
+        cache_dir: Path | None = None,
         rate_limit_ms: int = 150,
     ):
         if not HAS_REQUESTS:
@@ -112,7 +114,7 @@ class EDHRecClient:
         hash_key = hashlib.md5(key.encode()).hexdigest()
         return self.cache_dir / f"{hash_key}.json"
 
-    def _get_cached(self, key: str) -> Optional[dict]:
+    def _get_cached(self, key: str) -> dict | None:
         """Get cached response if available."""
         cache_path = self._get_cache_path(key)
         if cache_path.exists():
@@ -132,7 +134,7 @@ class EDHRecClient:
         if cache_path.exists():
             cache_path.unlink()
 
-    def _fetch(self, url: str, cache_key: str, use_cache: bool = True) -> Optional[dict]:
+    def _fetch(self, url: str, cache_key: str, use_cache: bool = True) -> dict | None:
         """
         Fetch JSON from URL with caching and rate limiting.
 
@@ -195,7 +197,7 @@ class EDHRecClient:
         self,
         limit: int = 100,
         use_cache: bool = True,
-        colors: Optional[list[str]] = None,
+        colors: list[str] | None = None,
     ) -> list[dict]:
         """
         Get the top commanders by popularity.
@@ -256,7 +258,7 @@ class EDHRecClient:
         self,
         name: str,
         use_cache: bool = True,
-    ) -> Optional[dict]:
+    ) -> dict | None:
         """
         Get full commander data including card recommendations.
 
@@ -412,7 +414,7 @@ class EDHRecClient:
 # Convenience functions
 
 
-def fetch_commander_recommendations(name: str) -> Optional[dict]:
+def fetch_commander_recommendations(name: str) -> dict | None:
     """Quick helper to fetch recommendations for a commander."""
     client = EDHRecClient()
     return client.get_commander_data(name)

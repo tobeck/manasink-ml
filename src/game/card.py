@@ -2,12 +2,9 @@
 Card representation and Scryfall data integration.
 """
 
+import re
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Optional
-import hashlib
-import json
-import re
 
 
 class CardType(Enum):
@@ -248,8 +245,8 @@ class Card:
     oracle_text: str = ""
 
     # Creature stats
-    power: Optional[int] = None
-    toughness: Optional[int] = None
+    power: int | None = None
+    toughness: int | None = None
 
     # Color identity (for Commander legality)
     color_identity: set[Color] = field(default_factory=set)
@@ -258,7 +255,7 @@ class Card:
     keywords: set[str] = field(default_factory=set)
 
     # Scryfall ID for reference
-    scryfall_id: Optional[str] = None
+    scryfall_id: str | None = None
 
     # Is this a commander?
     is_commander: bool = False

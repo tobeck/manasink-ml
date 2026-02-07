@@ -13,25 +13,23 @@ Caching:
     TTL defaults to 1 hour for recommendations, 6 hours for synergy.
 """
 
-from collections import defaultdict
-from pathlib import Path
-from typing import Optional
 import logging
+from collections import defaultdict
 
+from .cache import cache
 from .models import (
-    RecommendCardsResponse,
-    CardRecommendation,
     AnalyzeDeckResponse,
-    DeckAnalysis,
     CardPerformance,
-    DeckSuggestion,
-    SynergyResponse,
+    CardRecommendation,
     CardSynergy,
+    DeckAnalysis,
+    DeckSuggestion,
+    HealthResponse,
+    RecommendCardsResponse,
     SimulateResponse,
     SimulationResult,
-    HealthResponse,
+    SynergyResponse,
 )
-from .cache import cache, get_cache_stats
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +79,7 @@ def get_health_status() -> HealthResponse:
 
 
 def _list_commanders_impl(
-    color_identity: Optional[str],
+    color_identity: str | None,
     min_decks: int,
     limit: int,
 ) -> list[dict]:
@@ -96,7 +94,7 @@ def _list_commanders_impl(
 
 
 def list_commanders(
-    color_identity: Optional[str] = None,
+    color_identity: str | None = None,
     min_decks: int = 100,
     limit: int = 50,
 ) -> list[dict]:
@@ -127,12 +125,12 @@ def _get_recommendations_impl(
     commander: str,
     count: int,
     exclude_tuple: tuple,  # Tuple for hashability
-    budget: Optional[str],
-    categories_tuple: Optional[tuple],  # Tuple for hashability
-) -> Optional[dict]:
+    budget: str | None,
+    categories_tuple: tuple | None,  # Tuple for hashability
+) -> dict | None:
     """Internal implementation of get_card_recommendations."""
+    from src.data.database import DEFAULT_DB_PATH
     from src.data.deck_loader import load_synergy_data
-    from src.data.database import CardDatabase, DEFAULT_DB_PATH
 
     exclude_set = set(e.lower() for e in exclude_tuple)
     categories = list(categories_tuple) if categories_tuple else None
@@ -222,10 +220,10 @@ def _get_recommendations_impl(
 def get_card_recommendations(
     commander: str,
     count: int = 20,
-    exclude: Optional[list[str]] = None,
-    budget: Optional[str] = None,
-    categories: Optional[list[str]] = None,
-) -> Optional[RecommendCardsResponse]:
+    exclude: list[str] | None = None,
+    budget: str | None = None,
+    categories: list[str] | None = None,
+) -> RecommendCardsResponse | None:
     """
     Get card recommendations for a commander (cached).
 
@@ -244,7 +242,9 @@ def get_card_recommendations(
     categories_tuple = tuple(sorted(categories)) if categories else None
 
     # Create cache key (exclude affects results, so include in key)
-    cache_key = f"recommendations:{commander.lower()}:{count}:{hash(exclude_tuple)}:{budget}:{hash(categories_tuple) if categories_tuple else 'none'}"
+    cat_hash = hash(categories_tuple) if categories_tuple else "none"
+    exc_hash = hash(exclude_tuple)
+    cache_key = f"recommendations:{commander.lower()}:{count}:{exc_hash}:{budget}:{cat_hash}"
 
     # Try cache first (only for requests without exclusions)
     if not exclude_tuple:
@@ -272,87 +272,6 @@ def get_card_recommendations(
         total_available=result["total_available"],
     )
 
-    # Load synergy data for commander
-    synergy_data = load_synergy_data(commander)
-    if synergy_data is None:
-        return None
-
-    # Get all recommendations from database
-    import sqlite3
-
-    conn = sqlite3.connect(DEFAULT_DB_PATH)
-    conn.row_factory = sqlite3.Row
-
-    # Find commander ID
-    cursor = conn.execute(
-        "SELECT id FROM commanders WHERE name = ? OR name LIKE ?",
-        (synergy_data.commander_name, f"%{commander}%"),
-    )
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
-        return None
-
-    commander_id = row["id"]
-
-    # Get recommendations
-    cursor = conn.execute(
-        """
-        SELECT card_name, synergy_score, inclusion_rate, category
-        FROM commander_recommendations
-        WHERE commander_id = ?
-        ORDER BY synergy_score DESC, inclusion_rate DESC
-        """,
-        (commander_id,),
-    )
-
-    recommendations = []
-    total_available = 0
-
-    for row in cursor:
-        total_available += 1
-        card_name = row["card_name"]
-
-        # Skip excluded cards
-        if card_name.lower() in exclude_set:
-            continue
-
-        # Filter by category if specified
-        if categories:
-            card_category = row["category"] or ""
-            if not any(cat.lower() in card_category.lower() for cat in categories):
-                continue
-
-        # Get additional card info
-        card_info = _get_card_info(conn, card_name)
-
-        recommendations.append(
-            CardRecommendation(
-                name=card_name,
-                synergy_score=row["synergy_score"] or 0.0,
-                inclusion_rate=row["inclusion_rate"] or 0.0,
-                category=row["category"],
-                cmc=card_info.get("cmc", 0),
-                type_line=card_info.get("type_line"),
-                reason=_generate_recommendation_reason(
-                    row["synergy_score"],
-                    row["inclusion_rate"],
-                    row["category"],
-                ),
-            )
-        )
-
-        if len(recommendations) >= count:
-            break
-
-    conn.close()
-
-    return RecommendCardsResponse(
-        commander=synergy_data.commander_name,
-        recommendations=recommendations,
-        total_available=total_available,
-    )
-
 
 def _get_card_info(conn, card_name: str) -> dict:
     """Get basic card info from database."""
@@ -369,7 +288,7 @@ def _get_card_info(conn, card_name: str) -> dict:
 def _generate_recommendation_reason(
     synergy: float,
     inclusion: float,
-    category: Optional[str],
+    category: str | None,
 ) -> str:
     """Generate a human-readable reason for recommendation."""
     reasons = []
@@ -400,7 +319,7 @@ def analyze_deck(
     decklist: list[str],
     num_simulations: int = 10,
     max_turns: int = 10,
-) -> Optional[AnalyzeDeckResponse]:
+) -> AnalyzeDeckResponse | None:
     """
     Analyze a deck with simulations.
 
@@ -413,9 +332,9 @@ def analyze_deck(
     Returns:
         AnalyzeDeckResponse or None if commander not found
     """
+    from src.data.database import DEFAULT_DB_PATH, CardDatabase
     from src.data.deck_loader import load_synergy_data
-    from src.data.database import CardDatabase, DEFAULT_DB_PATH
-    from src.game import Simulator, GreedyPolicy, Card, CardType
+    from src.game import GreedyPolicy, Simulator
 
     # Load synergy data
     synergy_data = load_synergy_data(commander)
@@ -462,9 +381,7 @@ def analyze_deck(
     # Calculate deck statistics
     analysis = _calculate_deck_stats(resolved_cards, max_turns)
 
-    # Run simulations and track card performance
-    card_stats = defaultdict(lambda: {"drawn": 0, "played": 0, "turns": []})
-
+    # Run simulations
     sim = Simulator(max_turns=max_turns)
     policy = GreedyPolicy()
 
@@ -525,7 +442,6 @@ def analyze_deck(
 
 def _calculate_deck_stats(cards: list, max_turns: int) -> DeckAnalysis:
     """Calculate basic deck statistics."""
-    from src.game import CardType
 
     land_count = sum(1 for c in cards if c.is_land)
     creature_count = sum(1 for c in cards if c.is_creature)
@@ -620,7 +536,7 @@ def _generate_suggestions(
 # ============================================================================
 
 
-def _get_synergy_impl(commander: str, cards_tuple: tuple) -> Optional[dict]:
+def _get_synergy_impl(commander: str, cards_tuple: tuple) -> dict | None:
     """Internal implementation of get_synergy_scores."""
     from src.data.deck_loader import load_synergy_data
 
@@ -666,7 +582,7 @@ def _get_synergy_impl(commander: str, cards_tuple: tuple) -> Optional[dict]:
 def get_synergy_scores(
     commander: str,
     cards: list[str],
-) -> Optional[SynergyResponse]:
+) -> SynergyResponse | None:
     """
     Get synergy scores for cards with a commander (cached).
 
@@ -728,11 +644,11 @@ def _get_pair_reason(syn1: float, syn2: float) -> str:
 
 def run_simulation(
     decklist: list[str],
-    commander: Optional[str] = None,
+    commander: str | None = None,
     num_games: int = 10,
     max_turns: int = 15,
-    seed: Optional[int] = None,
-) -> Optional[SimulateResponse]:
+    seed: int | None = None,
+) -> SimulateResponse | None:
     """
     Run goldfish simulations.
 
@@ -746,8 +662,8 @@ def run_simulation(
     Returns:
         SimulateResponse or None if cards can't be resolved
     """
-    from src.data.database import CardDatabase, DEFAULT_DB_PATH
-    from src.game import Simulator, GreedyPolicy
+    from src.data.database import DEFAULT_DB_PATH, CardDatabase
+    from src.game import GreedyPolicy, Simulator
 
     # Resolve cards
     db = CardDatabase(DEFAULT_DB_PATH)

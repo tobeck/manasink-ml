@@ -3,25 +3,24 @@ Tests for synergy-aware policy.
 """
 
 import pytest
+
 from src.game import (
-    Card,
-    ManaCost,
-    CardType,
-    Color,
-    GameState,
-    create_game,
-    Phase,
+    BASIC_LANDS,
     Action,
     ActionType,
-    BASIC_LANDS,
+    Card,
+    CardType,
+    ManaCost,
+    Phase,
+    create_game,
 )
+from src.game.state import Permanent
 from src.game.synergy_policy import (
     SynergyAwarePolicy,
     SynergyBonus,
     SynergyContext,
     create_empty_context,
 )
-from src.game.state import Permanent
 
 
 class TestSynergyBonus:
@@ -222,7 +221,8 @@ class TestSynergyAwarePolicy:
             card_types={CardType.INSTANT},
         )
 
-        action = Action(action_type=ActionType.CAST_SPELL, card=draw)
+        # Create action to verify the card is valid (not needed, just context)
+        Action(action_type=ActionType.CAST_SPELL, card=draw)
         bonus = self.policy._get_category_bonus("Card Draw", state)
 
         # Should get bonus for low hand

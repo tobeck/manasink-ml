@@ -17,19 +17,19 @@ PPO (Proximal Policy Optimization) is used for stable policy updates:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Optional
-import random
+from typing import TYPE_CHECKING
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from .state_encoder import StateEncoder, EncodedState, batch_encode_states
-from .policy_network import PolicyNetwork, NeuralPolicy
+from .policy_network import NeuralPolicy, PolicyNetwork
+from .state_encoder import EncodedState, StateEncoder
 
 if TYPE_CHECKING:
+    from src.game.actions import Action
     from src.game.card import Card
     from src.game.state import GameState
     from src.game.synergy_policy import SynergyContext
@@ -56,7 +56,7 @@ class Experience:
 
     # For debugging/analysis
     turn_number: int = 0
-    card_played: Optional[str] = None
+    card_played: str | None = None
 
 
 @dataclass
@@ -209,8 +209,8 @@ class Trainer:
     def __init__(
         self,
         config: TrainingConfig,
-        synergy_context: Optional["SynergyContext"] = None,
-        device: Optional[torch.device] = None,
+        synergy_context: SynergyContext | None = None,
+        device: torch.device | None = None,
     ):
         """
         Initialize the trainer.
@@ -256,9 +256,9 @@ class Trainer:
 
     def train(
         self,
-        deck: list["Card"],
-        commander: Optional["Card"] = None,
-        num_episodes: Optional[int] = None,
+        deck: list[Card],
+        commander: Card | None = None,
+        num_episodes: int | None = None,
         verbose: bool = True,
     ) -> list[TrainingMetrics]:
         """
@@ -324,9 +324,9 @@ class Trainer:
 
     def collect_episode(
         self,
-        deck: list["Card"],
-        commander: Optional["Card"] = None,
-        seed: Optional[int] = None,
+        deck: list[Card],
+        commander: Card | None = None,
+        seed: int | None = None,
     ) -> TrainingMetrics:
         """
         Run one goldfish episode and collect experiences.
@@ -339,9 +339,8 @@ class Trainer:
         Returns:
             Episode metrics
         """
-        from src.game.simulator import Simulator
+        from src.game.actions import Action, ActionType, execute_action, get_legal_actions
         from src.game.state import create_game
-        from src.game.actions import Action, ActionType, get_legal_actions, execute_action
 
         # Create game state
         state = create_game("Trainer", "Dummy", seed=seed)
@@ -441,8 +440,8 @@ class Trainer:
 
     def _compute_reward(
         self,
-        state: "GameState",
-        action: "Action",
+        state: GameState,
+        action: Action,
         prev_opponent_life: int,
     ) -> float:
         """
@@ -657,8 +656,8 @@ class Trainer:
 
 
 def create_trainer(
-    config: Optional[TrainingConfig] = None,
-    synergy_context: Optional["SynergyContext"] = None,
+    config: TrainingConfig | None = None,
+    synergy_context: SynergyContext | None = None,
 ) -> Trainer:
     """
     Factory function to create a Trainer with default settings.

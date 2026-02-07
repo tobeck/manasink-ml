@@ -19,12 +19,12 @@ Configuration:
 """
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
-from dataclasses import dataclass
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 
@@ -103,16 +103,16 @@ class DatabaseManager:
     """
 
     _instance: Optional["DatabaseManager"] = None
-    _config: Optional[DatabaseConfig] = None
+    _config: DatabaseConfig | None = None
 
-    def __new__(cls, config: Optional[DatabaseConfig] = None):
+    def __new__(cls, config: DatabaseConfig | None = None):
         """Singleton pattern - one database manager per process."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
 
-    def __init__(self, config: Optional[DatabaseConfig] = None):
+    def __init__(self, config: DatabaseConfig | None = None):
         if self._initialized and config is None:
             return
 

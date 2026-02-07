@@ -2,13 +2,13 @@
 Game state representation with zones and turn tracking.
 """
 
+import random
+from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
-import random
-from copy import deepcopy
 
-from .card import Card, ManaPool, Color, CardType
+from .card import Card, Color, ManaCost, ManaPool
 
 
 class Phase(Enum):
@@ -148,7 +148,7 @@ class Player:
     exile: list[Card] = field(default_factory=list)
 
     # Commander
-    commander: Optional[Card] = None
+    commander: Card | None = None
     commander_zone: bool = True  # Is commander in command zone?
     commander_tax: int = 0  # Additional cost for recasting
 
@@ -158,7 +158,7 @@ class Player:
     # Turn state
     land_played_this_turn: bool = False
 
-    def shuffle_library(self, rng: Optional[random.Random] = None) -> None:
+    def shuffle_library(self, rng: random.Random | None = None) -> None:
         """Shuffle the library."""
         if rng:
             rng.shuffle(self.library)
@@ -291,7 +291,7 @@ class GameState:
     rng: random.Random = field(default_factory=random.Random)
 
     # Game over state
-    winner: Optional[int] = None  # Index of winning player, None if ongoing
+    winner: int | None = None  # Index of winning player, None if ongoing
 
     @property
     def active_player(self) -> Player:
@@ -366,8 +366,8 @@ class GameState:
         self,
         deck1: list[Card],
         deck2: list[Card],
-        commander1: Optional[Card] = None,
-        commander2: Optional[Card] = None,
+        commander1: Card | None = None,
+        commander2: Card | None = None,
     ) -> None:
         """
         Initialize a new game with the given decks.
@@ -414,13 +414,15 @@ class GameState:
         }
 
     def __repr__(self) -> str:
-        return f"GameState(turn={self.turn_number}, phase={self.phase.name}, active={self.active_player.name})"
+        phase = self.phase.name
+        active = self.active_player.name
+        return f"GameState(turn={self.turn_number}, phase={phase}, active={active})"
 
 
 def create_game(
     player1_name: str = "Player 1",
     player2_name: str = "Player 2",
-    seed: Optional[int] = None,
+    seed: int | None = None,
 ) -> GameState:
     """Create a new game with two players."""
     rng = random.Random(seed) if seed is not None else random.Random()

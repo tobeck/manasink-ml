@@ -18,8 +18,6 @@ Or via CLI:
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from pathlib import Path
-from typing import Optional
 
 try:
     from tqdm import tqdm
@@ -30,11 +28,11 @@ except ImportError:
 
 from .db_config import DatabaseConfig, DatabaseManager
 from .db_models import (
+    AverageDeckCard,
     CardModel,
+    CardSaltScore,
     CommanderModel,
     CommanderRecommendation,
-    AverageDeckCard,
-    CardSaltScore,
     EDHRecSyncMetadata,
 )
 from .edhrec import EDHRecClient
@@ -100,7 +98,7 @@ def estimate_deck_power(
 
 
 def sync_edhrec_data(
-    config: Optional[DatabaseConfig] = None,
+    config: DatabaseConfig | None = None,
     limit: int = 100,
     force: bool = False,
     show_progress: bool = True,
@@ -276,7 +274,7 @@ def sync_edhrec_data(
     session.commit()
     session.close()
 
-    print(f"\nEDHREC sync complete!")
+    print("\nEDHREC sync complete!")
     print(f"  Commanders: {result['commanders_synced']}")
     print(f"  Recommendations: {result['recommendations_synced']:,}")
     print(f"  Average deck cards: {result['average_deck_cards']:,}")
@@ -285,7 +283,7 @@ def sync_edhrec_data(
     return result
 
 
-def get_edhrec_stats(config: Optional[DatabaseConfig] = None) -> dict:
+def get_edhrec_stats(config: DatabaseConfig | None = None) -> dict:
     """
     Get statistics about the EDHREC data in the database.
 
@@ -344,10 +342,10 @@ def get_edhrec_stats(config: Optional[DatabaseConfig] = None) -> dict:
 
 def get_commander_recommendations(
     commander_name: str,
-    config: Optional[DatabaseConfig] = None,
+    config: DatabaseConfig | None = None,
     limit: int = 50,
-    min_synergy: Optional[float] = None,
-    category: Optional[str] = None,
+    min_synergy: float | None = None,
+    category: str | None = None,
 ) -> list[dict]:
     """
     Get card recommendations for a commander from the database.
@@ -409,7 +407,7 @@ def get_commander_recommendations(
         return []
 
 
-def get_salt_scores_from_db(config: Optional[DatabaseConfig] = None) -> dict[str, float]:
+def get_salt_scores_from_db(config: DatabaseConfig | None = None) -> dict[str, float]:
     """
     Get all salt scores from the database.
 

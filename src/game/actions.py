@@ -4,10 +4,9 @@ Action generation and execution for the game simulator.
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional, Union
 
 from .card import Card, CardType
-from .state import GameState, Player, Permanent, Phase
+from .state import GameState, Permanent, Phase, Player
 
 
 class ActionType(Enum):
@@ -28,12 +27,12 @@ class Action:
     """
 
     action_type: ActionType
-    card: Optional[Card] = None
-    source: Optional[Permanent] = None
-    targets: list[Union[Permanent, Player]] = None
+    card: Card | None = None
+    source: Permanent | None = None
+    targets: list[Permanent | Player] = None
     attackers: list[Permanent] = None  # For ATTACK actions
-    blocker: Optional[Permanent] = None  # For BLOCK actions
-    blocking: Optional[Permanent] = None  # What creature to block
+    blocker: Permanent | None = None  # For BLOCK actions
+    blocking: Permanent | None = None  # What creature to block
 
     def __post_init__(self):
         if self.targets is None:

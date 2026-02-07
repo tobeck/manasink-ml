@@ -13,33 +13,31 @@ API Documentation:
 - OpenAPI JSON: http://localhost:8000/openapi.json
 """
 
-from contextlib import asynccontextmanager
-from typing import Optional
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.utils import get_openapi
 
 from .models import (
-    RecommendCardsRequest,
-    RecommendCardsResponse,
     AnalyzeDeckRequest,
     AnalyzeDeckResponse,
-    SynergyRequest,
-    SynergyResponse,
+    ErrorResponse,
+    HealthResponse,
+    RecommendCardsRequest,
+    RecommendCardsResponse,
     SimulateRequest,
     SimulateResponse,
-    HealthResponse,
-    ErrorResponse,
+    SynergyRequest,
+    SynergyResponse,
 )
 from .services import (
-    get_card_recommendations,
     analyze_deck,
-    get_synergy_scores,
-    run_simulation,
+    get_card_recommendations,
     get_health_status,
+    get_synergy_scores,
     list_commanders,
+    run_simulation,
 )
 
 # Configure logging
@@ -161,7 +159,7 @@ async def cache_clear():
 
 @app.get("/commanders", tags=["Info"])
 async def get_commanders(
-    color_identity: Optional[str] = Query(
+    color_identity: str | None = Query(
         default=None,
         description="Filter by color identity (e.g., 'UG', 'WBR')",
     ),

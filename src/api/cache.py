@@ -20,13 +20,13 @@ Usage:
     invalidate_commander_cache("Atraxa, Praetors' Voice")
 """
 
-import json
-import os
-import hashlib
 import functools
+import hashlib
+import json
 import logging
-from typing import Optional, Any, Callable
-from datetime import timedelta
+import os
+from collections.abc import Callable
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class RedisCache:
 
     def __init__(
         self,
-        url: Optional[str] = None,
+        url: str | None = None,
         default_ttl: int = 3600,
         prefix: str = "manasink",
     ):
@@ -64,7 +64,7 @@ class RedisCache:
         self.url = url or os.environ.get("REDIS_URL", "redis://localhost:6379")
         self.default_ttl = default_ttl
         self.prefix = prefix
-        self._client: Optional["redis.Redis"] = None
+        self._client: redis.Redis | None = None
         self._connected = False
 
     def _get_client(self) -> Optional["redis.Redis"]:
@@ -103,7 +103,7 @@ class RedisCache:
         key_hash = hashlib.md5(key_data.encode()).hexdigest()[:12]
         return f"{self.prefix}:{prefix}:{key_hash}"
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Get a value from cache."""
         client = self._get_client()
         if not client:
@@ -122,7 +122,7 @@ class RedisCache:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> bool:
         """Set a value in cache."""
         client = self._get_client()
@@ -169,8 +169,8 @@ class RedisCache:
     def cached(
         self,
         prefix: str,
-        ttl: Optional[int] = None,
-        key_func: Optional[Callable] = None,
+        ttl: int | None = None,
+        key_func: Callable | None = None,
     ):
         """
         Decorator to cache function results.
@@ -271,7 +271,6 @@ def get_cache_stats() -> dict:
     try:
         info = client.info("stats")
         memory = client.info("memory")
-        keyspace = client.info("keyspace")
 
         # Count our keys
         our_keys = len(client.keys(f"{cache.prefix}:*"))
