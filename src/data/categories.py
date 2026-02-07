@@ -21,12 +21,12 @@ from typing import Optional
 
 try:
     from tqdm import tqdm
+
     HAS_TQDM = True
 except ImportError:
     HAS_TQDM = False
 
 from .database import DEFAULT_DB_PATH, create_categories_schema
-
 
 # Standard EDHREC categories and their aliases
 CATEGORY_MAPPING = {
@@ -219,19 +219,22 @@ def populate_card_categories(
         card_name = row["card_name"]
         category = normalize_category(row["category"])
 
-        conn.execute("""
+        conn.execute(
+            """
             INSERT OR REPLACE INTO card_categories
             (card_name, category, total_occurrences, commander_count,
              avg_synergy_score, avg_inclusion_rate)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, (
-            card_name,
-            category,
-            row["total_occurrences"],
-            row["commander_count"],
-            row["avg_synergy"] or 0,
-            row["avg_inclusion"] or 0,
-        ))
+        """,
+            (
+                card_name,
+                category,
+                row["total_occurrences"],
+                row["commander_count"],
+                row["avg_synergy"] or 0,
+                row["avg_inclusion"] or 0,
+            ),
+        )
         processed += 1
 
     conn.commit()
@@ -326,13 +329,16 @@ def get_card_categories(
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
 
-    cursor = conn.execute("""
+    cursor = conn.execute(
+        """
         SELECT category, total_occurrences, commander_count,
                avg_synergy_score, avg_inclusion_rate
         FROM card_categories
         WHERE card_name = ?
         ORDER BY commander_count DESC
-    """, (card_name,))
+    """,
+        (card_name,),
+    )
 
     results = [
         {
@@ -378,14 +384,17 @@ def get_cards_by_category(
     # Normalize the category for matching
     normalized = normalize_category(category)
 
-    cursor = conn.execute("""
+    cursor = conn.execute(
+        """
         SELECT card_name, total_occurrences, commander_count,
                avg_synergy_score, avg_inclusion_rate
         FROM card_categories
         WHERE category = ? AND commander_count >= ?
         ORDER BY commander_count DESC, avg_synergy_score DESC
         LIMIT ?
-    """, (normalized, min_commander_count, limit))
+    """,
+        (normalized, min_commander_count, limit),
+    )
 
     results = [
         {
@@ -472,8 +481,7 @@ def get_categories_stats(db_path: Optional[Path] = None) -> dict:
         LIMIT 10
     """)
     stats["top_categories"] = [
-        {"category": row["category"], "card_count": row["card_count"]}
-        for row in cursor
+        {"category": row["category"], "card_count": row["card_count"]} for row in cursor
     ]
 
     conn.close()

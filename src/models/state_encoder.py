@@ -305,15 +305,17 @@ class StateEncoder:
 
         # Mana costs (7 dims: W, U, B, R, G, C, CMC)
         cost = card.mana_cost
-        features.extend([
-            float(cost.white),
-            float(cost.blue),
-            float(cost.black),
-            float(cost.red),
-            float(cost.green),
-            float(cost.colorless),
-            float(card.cmc),
-        ])
+        features.extend(
+            [
+                float(cost.white),
+                float(cost.blue),
+                float(cost.black),
+                float(cost.red),
+                float(cost.green),
+                float(cost.colorless),
+                float(card.cmc),
+            ]
+        )
 
         # Card types (8 dims)
         features.append(1.0 if card.is_creature else 0.0)
@@ -374,9 +376,7 @@ def batch_encode_states(
     return {
         "hand": torch.stack([s.hand for s in encoded_states]),
         "battlefield": torch.stack([s.battlefield for s in encoded_states]),
-        "opponent_battlefield": torch.stack(
-            [s.opponent_battlefield for s in encoded_states]
-        ),
+        "opponent_battlefield": torch.stack([s.opponent_battlefield for s in encoded_states]),
         "global_features": torch.stack([s.global_features for s in encoded_states]),
         "hand_mask": torch.stack([s.hand_mask for s in encoded_states]),
         "battlefield_mask": torch.stack([s.battlefield_mask for s in encoded_states]),

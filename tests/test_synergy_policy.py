@@ -4,9 +4,16 @@ Tests for synergy-aware policy.
 
 import pytest
 from src.game import (
-    Card, ManaCost, CardType, Color,
-    GameState, create_game, Phase,
-    Action, ActionType, BASIC_LANDS,
+    Card,
+    ManaCost,
+    CardType,
+    Color,
+    GameState,
+    create_game,
+    Phase,
+    Action,
+    ActionType,
+    BASIC_LANDS,
 )
 from src.game.synergy_policy import (
     SynergyAwarePolicy,
@@ -258,8 +265,7 @@ class TestCategoryBonuses:
         state = create_game(seed=42)
         state.turn_number = 3
         state.players[0].battlefield = [
-            Permanent(card=BASIC_LANDS["Forest"], summoning_sick=False)
-            for _ in range(3)
+            Permanent(card=BASIC_LANDS["Forest"], summoning_sick=False) for _ in range(3)
         ]
 
         bonus = self.policy._get_category_bonus("Ramp", state)
@@ -269,8 +275,7 @@ class TestCategoryBonuses:
         state = create_game(seed=42)
         state.turn_number = 10
         state.players[0].battlefield = [
-            Permanent(card=BASIC_LANDS["Forest"], summoning_sick=False)
-            for _ in range(8)
+            Permanent(card=BASIC_LANDS["Forest"], summoning_sick=False) for _ in range(8)
         ]
 
         bonus = self.policy._get_category_bonus("Ramp", state)
@@ -286,8 +291,7 @@ class TestCategoryBonuses:
             card_types={CardType.CREATURE},
         )
         state.players[1].battlefield = [
-            Permanent(card=creature, summoning_sick=False)
-            for _ in range(4)
+            Permanent(card=creature, summoning_sick=False) for _ in range(4)
         ]
 
         bonus = self.policy._get_category_bonus("Removal", state)
@@ -303,14 +307,11 @@ class TestCategoryBonuses:
         )
 
         # We have 1 creature
-        state.players[0].battlefield = [
-            Permanent(card=creature, summoning_sick=False)
-        ]
+        state.players[0].battlefield = [Permanent(card=creature, summoning_sick=False)]
 
         # Opponent has 5 creatures
         state.players[1].battlefield = [
-            Permanent(card=creature, summoning_sick=False)
-            for _ in range(5)
+            Permanent(card=creature, summoning_sick=False) for _ in range(5)
         ]
 
         bonus = self.policy._get_category_bonus("Board Wipe", state)

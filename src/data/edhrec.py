@@ -17,6 +17,7 @@ import hashlib
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
@@ -36,14 +37,36 @@ DEFAULT_HEADERS = {
 # Color combinations to query for commanders (most popular combinations)
 # Note: /commanders.json is blocked, so we aggregate from color pages
 COLOR_COMBINATIONS = [
-    "w", "u", "b", "r", "g",  # mono
-    "wu", "wb", "wr", "wg",  # white pairs
-    "ub", "ur", "ug",  # blue pairs
-    "br", "bg",  # black pairs
+    "w",
+    "u",
+    "b",
+    "r",
+    "g",  # mono
+    "wu",
+    "wb",
+    "wr",
+    "wg",  # white pairs
+    "ub",
+    "ur",
+    "ug",  # blue pairs
+    "br",
+    "bg",  # black pairs
     "rg",  # red-green
-    "wub", "wur", "wug", "wbr", "wbg", "wrg",  # 3-color with white
-    "ubr", "ubg", "urg", "brg",  # 3-color without white
-    "wubr", "wubg", "wurg", "wbrg", "ubrg",  # 4-color
+    "wub",
+    "wur",
+    "wug",
+    "wbr",
+    "wbg",
+    "wrg",  # 3-color with white
+    "ubr",
+    "ubg",
+    "urg",
+    "brg",  # 3-color without white
+    "wubr",
+    "wubg",
+    "wurg",
+    "wbrg",
+    "ubrg",  # 4-color
     "wubrg",  # 5-color
     "colorless",  # colorless
 ]
@@ -387,6 +410,7 @@ class EDHRecClient:
 
 
 # Convenience functions
+
 
 def fetch_commander_recommendations(name: str) -> Optional[dict]:
     """Quick helper to fetch recommendations for a commander."""

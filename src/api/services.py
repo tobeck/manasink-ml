@@ -54,9 +54,7 @@ def get_health_status() -> HealthResponse:
             import sqlite3
 
             conn = sqlite3.connect(DEFAULT_DB_PATH)
-            cursor = conn.execute(
-                "SELECT COUNT(DISTINCT commander_id) FROM average_decks"
-            )
+            cursor = conn.execute("SELECT COUNT(DISTINCT commander_id) FROM average_decks")
             commanders_available = cursor.fetchone()[0] or 0
             conn.close()
             db.close()
@@ -446,10 +444,7 @@ def _generate_suggestions(
         )
 
     # Suggest cuts for low synergy cards
-    low_synergy = [
-        cp for cp in card_performance
-        if cp.synergy_score < 0.1 and cp.category is None
-    ]
+    low_synergy = [cp for cp in card_performance if cp.synergy_score < 0.1 and cp.category is None]
     for cp in low_synergy[:3]:
         suggestions.append(
             DeckSuggestion(
@@ -496,7 +491,7 @@ def get_synergy_scores(
     # Calculate pair synergies (simplified: average of individual scores)
     pair_synergies = []
     for i, card1 in enumerate(cards):
-        for card2 in cards[i + 1:]:
+        for card2 in cards[i + 1 :]:
             syn1 = card_synergies.get(card1, 0)
             syn2 = card_synergies.get(card2, 0)
             combined = (syn1 + syn2) / 2
@@ -510,11 +505,7 @@ def get_synergy_scores(
                 )
             )
 
-    avg_synergy = (
-        sum(card_synergies.values()) / len(card_synergies)
-        if card_synergies
-        else 0
-    )
+    avg_synergy = sum(card_synergies.values()) / len(card_synergies) if card_synergies else 0
 
     return SynergyResponse(
         commander=synergy_data.commander_name,

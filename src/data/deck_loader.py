@@ -102,8 +102,13 @@ def load_deck_from_edhrec(
     color_identity_str = cmd_row["color_identity"] or ""
 
     # Parse color identity
-    color_map = {"W": Color.WHITE, "U": Color.BLUE, "B": Color.BLACK,
-                 "R": Color.RED, "G": Color.GREEN}
+    color_map = {
+        "W": Color.WHITE,
+        "U": Color.BLUE,
+        "B": Color.BLACK,
+        "R": Color.RED,
+        "G": Color.GREEN,
+    }
     color_identity = {color_map[c] for c in color_identity_str if c in color_map}
 
     # Get the commander Card object
@@ -186,11 +191,14 @@ def load_synergy_data(
     commander_name_resolved = cmd_row["name"]
 
     # Get all recommendations
-    cursor = conn.execute("""
+    cursor = conn.execute(
+        """
         SELECT card_name, synergy_score, inclusion_rate, category
         FROM commander_recommendations
         WHERE commander_id = ?
-    """, (commander_id,))
+    """,
+        (commander_id,),
+    )
 
     synergies = {}
     inclusions = {}
@@ -272,13 +280,16 @@ def list_available_commanders(
 
     where_clause = " AND ".join(conditions)
 
-    cursor = conn.execute(f"""
+    cursor = conn.execute(
+        f"""
         SELECT name, num_decks, color_identity, edhrec_rank, salt_score
         FROM commanders
         WHERE {where_clause}
         ORDER BY num_decks DESC
         LIMIT ?
-    """, params + [limit])
+    """,
+        params + [limit],
+    )
 
     results = [
         {
@@ -327,7 +338,9 @@ def get_deck_stats(deck_result: DeckLoadResult) -> dict:
     stats["sorceries"] = sorceries
     stats["artifacts"] = artifacts
     stats["enchantments"] = enchantments
-    stats["other"] = deck_result.deck_size - creatures - lands - instants - sorceries - artifacts - enchantments
+    stats["other"] = (
+        deck_result.deck_size - creatures - lands - instants - sorceries - artifacts - enchantments
+    )
 
     # Mana curve (non-lands)
     non_lands = [c for c in deck_result.deck if not c.is_land]
@@ -344,5 +357,3 @@ def get_deck_stats(deck_result: DeckLoadResult) -> dict:
         stats["avg_cmc"] = 0
 
     return stats
-
-

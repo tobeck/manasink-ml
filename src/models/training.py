@@ -172,19 +172,13 @@ class ExperienceBuffer:
         # Stack encoded states
         states = {
             "hand": torch.stack([s.hand for s in self._states]).to(device),
-            "battlefield": torch.stack([s.battlefield for s in self._states]).to(
+            "battlefield": torch.stack([s.battlefield for s in self._states]).to(device),
+            "opponent_battlefield": torch.stack([s.opponent_battlefield for s in self._states]).to(
                 device
             ),
-            "opponent_battlefield": torch.stack(
-                [s.opponent_battlefield for s in self._states]
-            ).to(device),
-            "global_features": torch.stack(
-                [s.global_features for s in self._states]
-            ).to(device),
+            "global_features": torch.stack([s.global_features for s in self._states]).to(device),
             "hand_mask": torch.stack([s.hand_mask for s in self._states]).to(device),
-            "battlefield_mask": torch.stack(
-                [s.battlefield_mask for s in self._states]
-            ).to(device),
+            "battlefield_mask": torch.stack([s.battlefield_mask for s in self._states]).to(device),
             "opponent_battlefield_mask": torch.stack(
                 [s.opponent_battlefield_mask for s in self._states]
             ).to(device),
@@ -196,9 +190,7 @@ class ExperienceBuffer:
             "action_indices": torch.tensor(self._action_indices, device=device),
             "rewards": torch.tensor(self._rewards, dtype=torch.float32, device=device),
             "values": torch.tensor(self._values, dtype=torch.float32, device=device),
-            "log_probs": torch.tensor(
-                self._log_probs, dtype=torch.float32, device=device
-            ),
+            "log_probs": torch.tensor(self._log_probs, dtype=torch.float32, device=device),
             "dones": torch.tensor(self._dones, dtype=torch.float32, device=device),
         }
 
@@ -230,9 +222,7 @@ class Trainer:
         """
         self.config = config
         self.synergy_context = synergy_context
-        self.device = device or torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # Create encoder and network
         self.encoder = StateEncoder()
@@ -326,8 +316,7 @@ class Trainer:
             # Checkpointing
             if (episode + 1) % self.config.checkpoint_every == 0:
                 checkpoint_path = (
-                    Path(self.config.checkpoint_dir)
-                    / f"checkpoint_{self.total_episodes}.pt"
+                    Path(self.config.checkpoint_dir) / f"checkpoint_{self.total_episodes}.pt"
                 )
                 self.save_checkpoint(str(checkpoint_path))
 
@@ -387,9 +376,7 @@ class Trainer:
             action_mask = self.policy._create_action_mask(legal_actions)
 
             # Get action from policy with value and log_prob
-            action, log_prob, value, _ = self.policy.get_action_and_value(
-                state, legal_actions
-            )
+            action, log_prob, value, _ = self.policy.get_action_and_value(state, legal_actions)
 
             # Find action index
             try:
@@ -596,14 +583,10 @@ class Trainer:
             else:
                 next_value = last_value
 
-            delta = (
-                rewards[t]
-                + self.config.gamma * next_value * (1 - dones[t])
-                - values[t]
+            delta = rewards[t] + self.config.gamma * next_value * (1 - dones[t]) - values[t]
+            last_gae = (
+                delta + self.config.gamma * self.config.gae_lambda * (1 - dones[t]) * last_gae
             )
-            last_gae = delta + self.config.gamma * self.config.gae_lambda * (
-                1 - dones[t]
-            ) * last_gae
 
             advantages[t] = last_gae
             returns[t] = advantages[t] + values[t]

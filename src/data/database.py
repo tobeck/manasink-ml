@@ -15,7 +15,6 @@ from typing import Optional
 
 from src.game.card import Card, CardType, Color
 
-
 # Default database location
 DEFAULT_DB_PATH = Path("data/cards.db")
 
@@ -87,8 +86,7 @@ class CardDatabase:
         """
         conn = self._get_connection()
         cursor = conn.execute(
-            "SELECT scryfall_json FROM cards WHERE name_lower = ?",
-            (name.lower(),)
+            "SELECT scryfall_json FROM cards WHERE name_lower = ?", (name.lower(),)
         )
         row = cursor.fetchone()
         if row:
@@ -99,8 +97,7 @@ class CardDatabase:
         """Get a card by Scryfall ID."""
         conn = self._get_connection()
         cursor = conn.execute(
-            "SELECT scryfall_json FROM cards WHERE scryfall_id = ?",
-            (scryfall_id,)
+            "SELECT scryfall_json FROM cards WHERE scryfall_id = ?", (scryfall_id,)
         )
         row = cursor.fetchone()
         if row:
@@ -261,7 +258,9 @@ class CardDatabase:
             limit=limit,
         )
 
-    def get_random_cards(self, count: int = 10, card_types: Optional[list[str]] = None) -> list[Card]:
+    def get_random_cards(
+        self, count: int = 10, card_types: Optional[list[str]] = None
+    ) -> list[Card]:
         """Get random cards, optionally filtered by type."""
         conn = self._get_connection()
 
@@ -332,8 +331,7 @@ class CardDatabase:
         """Get the raw Scryfall JSON for a card (useful for debugging)."""
         conn = self._get_connection()
         cursor = conn.execute(
-            "SELECT scryfall_json FROM cards WHERE name_lower = ?",
-            (name.lower(),)
+            "SELECT scryfall_json FROM cards WHERE name_lower = ?", (name.lower(),)
         )
         row = cursor.fetchone()
         if row:
@@ -344,6 +342,7 @@ class CardDatabase:
 # -----------------------------------------------------------------------------
 # Schema Creation (used by ingest module)
 # -----------------------------------------------------------------------------
+
 
 def create_schema(db_path: Path) -> sqlite3.Connection:
     """
@@ -574,6 +573,7 @@ def create_categories_schema(db_path: Path) -> sqlite3.Connection:
 # -----------------------------------------------------------------------------
 # Helper Functions
 # -----------------------------------------------------------------------------
+
 
 def _normalize_colors(colors: str) -> str:
     """Normalize a color string to sorted uppercase (e.g., 'ug' -> 'GU')."""

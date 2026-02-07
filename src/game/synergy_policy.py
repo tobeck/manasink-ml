@@ -28,8 +28,12 @@ from .simulator import Policy
 class SynergyBonus:
     """Tracks synergy bonuses accumulated during a game."""
 
-    cards_played: list[tuple[str, float]] = field(default_factory=list)  # (card_name, synergy_score)
-    category_bonuses: list[tuple[str, str, float]] = field(default_factory=list)  # (card_name, category, bonus)
+    cards_played: list[tuple[str, float]] = field(
+        default_factory=list
+    )  # (card_name, synergy_score)
+    category_bonuses: list[tuple[str, str, float]] = field(
+        default_factory=list
+    )  # (card_name, category, bonus)
 
     @property
     def total_synergy(self) -> float:
@@ -167,9 +171,7 @@ class SynergyAwarePolicy(Policy):
 
         # Attack actions - score based on total power
         if action.action_type == ActionType.ATTACK:
-            total_power = sum(
-                (a.card.power or 0) for a in getattr(action, 'attackers', [])
-            )
+            total_power = sum((a.card.power or 0) for a in getattr(action, "attackers", []))
             return 50 + total_power
 
         # Cast spell actions

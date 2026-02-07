@@ -554,12 +554,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Sync command
     sync_parser = subparsers.add_parser("sync", help="Download and populate card database")
     sync_parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Force re-download even if up to date",
     )
     sync_parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress progress bars",
     )
@@ -592,22 +594,23 @@ def main(argv: Optional[list[str]] = None) -> int:
     commanders_parser.add_argument("--limit", "-l", type=int, default=50, help="Max results")
 
     # EDHREC sync command
-    edhrec_sync_parser = subparsers.add_parser(
-        "edhrec-sync", help="Sync EDHREC commander data"
-    )
+    edhrec_sync_parser = subparsers.add_parser("edhrec-sync", help="Sync EDHREC commander data")
     edhrec_sync_parser.add_argument(
-        "--limit", "-l",
+        "--limit",
+        "-l",
         type=int,
         default=100,
         help="Number of top commanders to sync (default: 100)",
     )
     edhrec_sync_parser.add_argument(
-        "--force", "-f",
+        "--force",
+        "-f",
         action="store_true",
         help="Force re-sync even if recently updated",
     )
     edhrec_sync_parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress progress bars",
     )
@@ -621,7 +624,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     )
     edhrec_recs_parser.add_argument("name", help="Commander name")
     edhrec_recs_parser.add_argument(
-        "--limit", "-l",
+        "--limit",
+        "-l",
         type=int,
         default=50,
         help="Max recommendations to show",
@@ -632,11 +636,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Minimum synergy score (e.g., 0.1 for 10%%)",
     )
     edhrec_recs_parser.add_argument(
-        "--category", "-c",
+        "--category",
+        "-c",
         help="Filter by category (e.g., Creatures, Ramp)",
     )
     edhrec_recs_parser.add_argument(
-        "--json", "-j",
+        "--json",
+        "-j",
         action="store_true",
         help="Output as JSON",
     )
@@ -662,7 +668,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Number of cards to process per batch (default: 1000)",
     )
     features_parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress progress bars",
     )
@@ -675,7 +682,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         "aggregate-categories", help="Aggregate card categories from EDHREC data"
     )
     categories_parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress progress bars",
     )

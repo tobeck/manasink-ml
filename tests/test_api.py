@@ -16,7 +16,6 @@ from src.api.models import (
 )
 from src.api.services import get_health_status
 
-
 # Create test client
 client = TestClient(app)
 
@@ -156,9 +155,7 @@ class TestAnalyzeDeckEndpoint:
         commander = commanders_response.json()["commanders"][0]["name"]
 
         # Create a minimal deck
-        decklist = ["Sol Ring", "Arcane Signet", "Command Tower"] + [
-            f"Forest" for _ in range(40)
-        ]
+        decklist = ["Sol Ring", "Arcane Signet", "Command Tower"] + [f"Forest" for _ in range(40)]
 
         response = client.post(
             "/analyze/deck",
@@ -275,10 +272,7 @@ class TestSimulateEndpoint:
     def test_simulate_basic(self):
         """Test basic simulation."""
         # Create a valid decklist
-        decklist = (
-            ["Forest"] * 40
-            + ["Llanowar Elves", "Elvish Mystic"] * 5
-        )
+        decklist = ["Forest"] * 40 + ["Llanowar Elves", "Elvish Mystic"] * 5
 
         response = client.post(
             "/simulate/goldfish",

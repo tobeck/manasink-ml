@@ -167,8 +167,7 @@ class TestTrainingPipelineIntegration:
 
         # Get initial weights
         initial_weights = {
-            name: param.clone()
-            for name, param in trainer.network.named_parameters()
+            name: param.clone() for name, param in trainer.network.named_parameters()
         }
 
         deck = create_test_deck({Color.GREEN})

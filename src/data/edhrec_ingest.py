@@ -24,6 +24,7 @@ from typing import Optional
 
 try:
     from tqdm import tqdm
+
     HAS_TQDM = True
 except ImportError:
     HAS_TQDM = False
@@ -35,6 +36,7 @@ from .edhrec import EDHRecClient
 @dataclass
 class PowerLevelEstimate:
     """Power level estimation based on salt scores."""
+
     salt_sum: float
     bracket: int  # 1-4
     power_score: int  # 1-10
@@ -202,9 +204,7 @@ def sync_edhrec_data(
         )
 
         # Get commander ID
-        cursor = conn.execute(
-            "SELECT id FROM commanders WHERE name = ?", (cmd_name,)
-        )
+        cursor = conn.execute("SELECT id FROM commanders WHERE name = ?", (cmd_name,))
         commander_id = cursor.fetchone()["id"]
 
         # Insert recommendations
@@ -318,9 +318,7 @@ def get_edhrec_stats(db_path: Optional[Path] = None) -> dict:
     stats = {"exists": True, "path": str(db_path)}
 
     # Check if EDHREC tables exist
-    cursor = conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='commanders'"
-    )
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='commanders'")
     if not cursor.fetchone():
         stats["edhrec_initialized"] = False
         conn.close()
@@ -345,37 +343,31 @@ def get_edhrec_stats(db_path: Optional[Path] = None) -> dict:
     stats["salt_scores"] = cursor.fetchone()["count"]
 
     # Top 5 commanders by deck count
-    cursor = conn.execute(
-        """
+    cursor = conn.execute("""
         SELECT name, num_decks, edhrec_rank
         FROM commanders
         ORDER BY num_decks DESC
         LIMIT 5
-        """
-    )
+        """)
     stats["top_commanders"] = [
         {"name": row["name"], "num_decks": row["num_decks"], "rank": row["edhrec_rank"]}
         for row in cursor
     ]
 
     # Highest salt cards
-    cursor = conn.execute(
-        """
+    cursor = conn.execute("""
         SELECT card_name, salt_score, salt_rank
         FROM card_salt_scores
         ORDER BY salt_score DESC
         LIMIT 5
-        """
-    )
+        """)
     stats["highest_salt"] = [
         {"name": row["card_name"], "salt": row["salt_score"], "rank": row["salt_rank"]}
         for row in cursor
     ]
 
     # Sync metadata
-    cursor = conn.execute(
-        "SELECT * FROM edhrec_sync_metadata ORDER BY id DESC LIMIT 1"
-    )
+    cursor = conn.execute("SELECT * FROM edhrec_sync_metadata ORDER BY id DESC LIMIT 1")
     row = cursor.fetchone()
     if row:
         stats["last_updated"] = row["last_updated"]

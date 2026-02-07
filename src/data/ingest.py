@@ -22,18 +22,19 @@ from typing import Optional
 
 try:
     import requests
+
     HAS_REQUESTS = True
 except ImportError:
     HAS_REQUESTS = False
 
 try:
     from tqdm import tqdm
+
     HAS_TQDM = True
 except ImportError:
     HAS_TQDM = False
 
 from .database import DEFAULT_DB_PATH, create_schema
-
 
 SCRYFALL_API_BASE = "https://api.scryfall.com"
 DEFAULT_BULK_PATH = Path("data/raw/scryfall_bulk.json")
@@ -402,10 +403,17 @@ def get_database_stats(db_path: Optional[Path] = None) -> dict:
     stats["commanders"] = cursor.fetchone()["count"]
 
     # By card type
-    for card_type in ["creature", "instant", "sorcery", "artifact", "enchantment", "land", "planeswalker"]:
+    for card_type in [
+        "creature",
+        "instant",
+        "sorcery",
+        "artifact",
+        "enchantment",
+        "land",
+        "planeswalker",
+    ]:
         cursor = conn.execute(
-            "SELECT COUNT(*) as count FROM cards WHERE type_line LIKE ?",
-            (f"%{card_type}%",)
+            "SELECT COUNT(*) as count FROM cards WHERE type_line LIKE ?", (f"%{card_type}%",)
         )
         stats[f"type_{card_type}"] = cursor.fetchone()["count"]
 

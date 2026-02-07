@@ -23,22 +23,47 @@ from typing import Optional
 
 try:
     from tqdm import tqdm
+
     HAS_TQDM = True
 except ImportError:
     HAS_TQDM = False
 
 from .database import DEFAULT_DB_PATH, create_features_schema
 
-
 # Keywords to encode in the bitmap (up to 32)
 KEYWORD_LIST = [
-    "flying", "first strike", "double strike", "deathtouch", "haste",
-    "hexproof", "indestructible", "lifelink", "menace", "reach",
-    "trample", "vigilance", "ward", "flash", "defender",
-    "proliferate", "cascade", "storm", "affinity", "convoke",
-    "delve", "dredge", "undying", "persist", "annihilator",
-    "infect", "wither", "exalted", "landfall", "threshold",
-    "kicker", "flashback",
+    "flying",
+    "first strike",
+    "double strike",
+    "deathtouch",
+    "haste",
+    "hexproof",
+    "indestructible",
+    "lifelink",
+    "menace",
+    "reach",
+    "trample",
+    "vigilance",
+    "ward",
+    "flash",
+    "defender",
+    "proliferate",
+    "cascade",
+    "storm",
+    "affinity",
+    "convoke",
+    "delve",
+    "dredge",
+    "undying",
+    "persist",
+    "annihilator",
+    "infect",
+    "wither",
+    "exalted",
+    "landfall",
+    "threshold",
+    "kicker",
+    "flashback",
 ]
 
 # Patterns for role detection in oracle text (case-insensitive matching)
@@ -160,16 +185,25 @@ class CardFeatures:
         """Convert features to a flat vector for ML input."""
         return [
             # Mana (6 + 1 cmc = 7)
-            float(self.mana_w), float(self.mana_u), float(self.mana_b),
-            float(self.mana_r), float(self.mana_g), float(self.mana_c),
+            float(self.mana_w),
+            float(self.mana_u),
+            float(self.mana_b),
+            float(self.mana_r),
+            float(self.mana_g),
+            float(self.mana_c),
             float(self.cmc),
             # Types (8)
-            float(self.is_creature), float(self.is_instant),
-            float(self.is_sorcery), float(self.is_artifact),
-            float(self.is_enchantment), float(self.is_planeswalker),
-            float(self.is_land), float(self.is_legendary),
+            float(self.is_creature),
+            float(self.is_instant),
+            float(self.is_sorcery),
+            float(self.is_artifact),
+            float(self.is_enchantment),
+            float(self.is_planeswalker),
+            float(self.is_land),
+            float(self.is_legendary),
             # Stats (2)
-            float(self.power or 0), float(self.toughness or 0),
+            float(self.power or 0),
+            float(self.toughness or 0),
             # Color identity (5 bits expanded)
             float((self.color_identity_bitmap >> 0) & 1),  # W
             float((self.color_identity_bitmap >> 1) & 1),  # U
@@ -177,9 +211,13 @@ class CardFeatures:
             float((self.color_identity_bitmap >> 3) & 1),  # R
             float((self.color_identity_bitmap >> 4) & 1),  # G
             # Roles (7)
-            float(self.role_ramp), float(self.role_card_draw), float(self.role_removal),
-            float(self.role_board_wipe), float(self.role_protection),
-            float(self.role_finisher), float(self.role_utility),
+            float(self.role_ramp),
+            float(self.role_card_draw),
+            float(self.role_removal),
+            float(self.role_board_wipe),
+            float(self.role_protection),
+            float(self.role_finisher),
+            float(self.role_utility),
         ]
 
     @staticmethod
@@ -195,20 +233,20 @@ def _parse_mana_cost(mana_cost: str) -> tuple[int, int, int, int, int, int]:
 
     mana_cost = mana_cost.upper()
 
-    w = mana_cost.count('W')
-    u = mana_cost.count('U')
-    b = mana_cost.count('B')
-    r = mana_cost.count('R')
-    g = mana_cost.count('G')
+    w = mana_cost.count("W")
+    u = mana_cost.count("U")
+    b = mana_cost.count("B")
+    r = mana_cost.count("R")
+    g = mana_cost.count("G")
 
     # Parse generic mana (colorless cost)
     c = 0
-    generic_match = re.findall(r'\{(\d+)\}', mana_cost)
+    generic_match = re.findall(r"\{(\d+)\}", mana_cost)
     for match in generic_match:
         c += int(match)
 
     # Also handle X costs
-    x_count = mana_cost.count('X')
+    x_count = mana_cost.count("X")
     # X is treated as 0 for feature purposes
 
     return (w, u, b, r, g, c)
@@ -232,7 +270,7 @@ def _encode_keywords(oracle_text: str, keywords: list[str]) -> int:
     bitmap = 0
     for i, kw in enumerate(KEYWORD_LIST):
         if kw in keyword_set:
-            bitmap |= (1 << i)
+            bitmap |= 1 << i
 
     return bitmap
 
@@ -243,11 +281,11 @@ def _encode_color_identity(color_identity: list[str]) -> int:
         return 0
 
     bitmap = 0
-    color_map = {'W': 0, 'U': 1, 'B': 2, 'R': 3, 'G': 4}
+    color_map = {"W": 0, "U": 1, "B": 2, "R": 3, "G": 4}
 
     for color in color_identity:
         if color in color_map:
-            bitmap |= (1 << color_map[color])
+            bitmap |= 1 << color_map[color]
 
     return bitmap
 
@@ -430,16 +468,34 @@ def populate_card_features(
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    f.scryfall_id, f.card_name,
-                    f.mana_w, f.mana_u, f.mana_b, f.mana_r, f.mana_g, f.mana_c,
+                    f.scryfall_id,
+                    f.card_name,
+                    f.mana_w,
+                    f.mana_u,
+                    f.mana_b,
+                    f.mana_r,
+                    f.mana_g,
+                    f.mana_c,
                     f.cmc,
-                    int(f.is_creature), int(f.is_instant), int(f.is_sorcery),
-                    int(f.is_artifact), int(f.is_enchantment), int(f.is_planeswalker),
-                    int(f.is_land), int(f.is_legendary),
-                    f.keyword_bitmap, f.power, f.toughness,
+                    int(f.is_creature),
+                    int(f.is_instant),
+                    int(f.is_sorcery),
+                    int(f.is_artifact),
+                    int(f.is_enchantment),
+                    int(f.is_planeswalker),
+                    int(f.is_land),
+                    int(f.is_legendary),
+                    f.keyword_bitmap,
+                    f.power,
+                    f.toughness,
                     f.color_identity_bitmap,
-                    f.role_ramp, f.role_card_draw, f.role_removal,
-                    f.role_board_wipe, f.role_protection, f.role_finisher, f.role_utility,
+                    f.role_ramp,
+                    f.role_card_draw,
+                    f.role_removal,
+                    f.role_board_wipe,
+                    f.role_protection,
+                    f.role_finisher,
+                    f.role_utility,
                 ),
             )
 

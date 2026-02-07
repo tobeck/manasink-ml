@@ -126,51 +126,63 @@ class TestDeckStats:
 
         # Add 35 lands
         for i in range(35):
-            deck.append(Card(
-                name=f"Forest {i}",
-                mana_cost=ManaCost(),
-                card_types={CardType.LAND},
-                color_identity={Color.GREEN},
-            ))
+            deck.append(
+                Card(
+                    name=f"Forest {i}",
+                    mana_cost=ManaCost(),
+                    card_types={CardType.LAND},
+                    color_identity={Color.GREEN},
+                )
+            )
 
         # Add 30 creatures
         for i in range(30):
-            deck.append(Card(
-                name=f"Creature {i}",
-                mana_cost=ManaCost(green=1, colorless=i % 6),
-                card_types={CardType.CREATURE},
-                power=i % 5 + 1,
-                toughness=i % 5 + 1,
-            ))
+            deck.append(
+                Card(
+                    name=f"Creature {i}",
+                    mana_cost=ManaCost(green=1, colorless=i % 6),
+                    card_types={CardType.CREATURE},
+                    power=i % 5 + 1,
+                    toughness=i % 5 + 1,
+                )
+            )
 
         # Add 10 instants
         for i in range(10):
-            deck.append(Card(
-                name=f"Instant {i}",
-                mana_cost=ManaCost(green=1),
-                card_types={CardType.INSTANT},
-            ))
+            deck.append(
+                Card(
+                    name=f"Instant {i}",
+                    mana_cost=ManaCost(green=1),
+                    card_types={CardType.INSTANT},
+                )
+            )
 
         # Add 10 sorceries
         for i in range(10):
-            deck.append(Card(
-                name=f"Sorcery {i}",
-                mana_cost=ManaCost(green=2),
-                card_types={CardType.SORCERY},
-            ))
+            deck.append(
+                Card(
+                    name=f"Sorcery {i}",
+                    mana_cost=ManaCost(green=2),
+                    card_types={CardType.SORCERY},
+                )
+            )
 
         # Add 14 artifacts/enchantments to reach 99
         for i in range(7):
-            deck.append(Card(
-                name=f"Artifact {i}",
-                mana_cost=ManaCost(colorless=3),
-                card_types={CardType.ARTIFACT},
-            ))
-            deck.append(Card(
-                name=f"Enchantment {i}",
-                mana_cost=ManaCost(green=1, colorless=2),
-                card_types={CardType.ENCHANTMENT},
-            ))
+            deck.append(
+                Card(
+                    name=f"Artifact {i}",
+                    mana_cost=ManaCost(colorless=3),
+                    card_types={CardType.ARTIFACT},
+                )
+            )
+            deck.append(
+                Card(
+                    name=f"Enchantment {i}",
+                    mana_cost=ManaCost(green=1, colorless=2),
+                    card_types={CardType.ENCHANTMENT},
+                )
+            )
 
         result = DeckLoadResult(
             commander=commander,

@@ -340,9 +340,7 @@ class TestNeuralPolicy:
         policy = NeuralPolicy(network, encoder)
 
         legal_actions = get_legal_actions(state)
-        action, log_prob, value, entropy = policy.get_action_and_value(
-            state, legal_actions
-        )
+        action, log_prob, value, entropy = policy.get_action_and_value(state, legal_actions)
 
         assert isinstance(action, Action)
         assert isinstance(log_prob, float)
