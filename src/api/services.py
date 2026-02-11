@@ -46,27 +46,28 @@ COMMANDERS_TTL = 3600  # 1 hour
 
 def get_health_status() -> HealthResponse:
     """Get health status of the API."""
-    from src.data.database import DEFAULT_DB_PATH, CardDatabase
+    from sqlalchemy import text
+
+    from src.data.db_config import DatabaseManager
+    from src.data.db_models import AverageDeckCard, CardModel
 
     db_connected = False
     cards_loaded = 0
     commanders_available = 0
 
     try:
-        if DEFAULT_DB_PATH.exists():
-            db = CardDatabase(DEFAULT_DB_PATH)
+        db = DatabaseManager()
+        with db.session() as session:
             # Check cards table
-            cards_loaded = db.get_card_count()
+            cards_loaded = session.query(CardModel).count()
             db_connected = True
 
             # Check commanders with deck data
-            import sqlite3
-
-            conn = sqlite3.connect(DEFAULT_DB_PATH)
-            cursor = conn.execute("SELECT COUNT(DISTINCT commander_id) FROM average_decks")
-            commanders_available = cursor.fetchone()[0] or 0
-            conn.close()
-            db.close()
+            commanders_available = (
+                session.query(AverageDeckCard.commander_id)
+                .distinct()
+                .count()
+            )
     except Exception as e:
         logger.error(f"Health check error: {e}")
 
@@ -129,7 +130,8 @@ def _get_recommendations_impl(
     categories_tuple: tuple | None,  # Tuple for hashability
 ) -> dict | None:
     """Internal implementation of get_card_recommendations."""
-    from src.data.database import DEFAULT_DB_PATH
+    from src.data.db_config import DatabaseManager
+    from src.data.db_models import CardModel, CommanderModel, CommanderRecommendation
     from src.data.deck_loader import load_synergy_data
 
     exclude_set = set(e.lower() for e in exclude_tuple)
@@ -140,81 +142,75 @@ def _get_recommendations_impl(
     if synergy_data is None:
         return None
 
-    # Get all recommendations from database
-    import sqlite3
+    manager = DatabaseManager()
 
-    conn = sqlite3.connect(DEFAULT_DB_PATH)
-    conn.row_factory = sqlite3.Row
+    with manager.session() as session:
+        # Find commander
+        cmd = (
+            session.query(CommanderModel)
+            .filter(
+                (CommanderModel.name == synergy_data.commander_name)
+                | (CommanderModel.name.ilike(f"%{commander}%"))
+            )
+            .first()
+        )
+        if not cmd:
+            return None
 
-    # Find commander ID
-    cursor = conn.execute(
-        "SELECT id FROM commanders WHERE name = ? OR name LIKE ?",
-        (synergy_data.commander_name, f"%{commander}%"),
-    )
-    row = cursor.fetchone()
-    if not row:
-        conn.close()
-        return None
-
-    commander_id = row["id"]
-
-    # Get recommendations
-    cursor = conn.execute(
-        """
-        SELECT card_name, synergy_score, inclusion_rate, category
-        FROM commander_recommendations
-        WHERE commander_id = ?
-        ORDER BY synergy_score DESC, inclusion_rate DESC
-        """,
-        (commander_id,),
-    )
-
-    recommendations = []
-    total_available = 0
-
-    for row in cursor:
-        total_available += 1
-        card_name = row["card_name"]
-
-        # Skip excluded cards
-        if card_name.lower() in exclude_set:
-            continue
-
-        # Filter by category if specified
-        if categories:
-            card_category = row["category"] or ""
-            if not any(cat.lower() in card_category.lower() for cat in categories):
-                continue
-
-        # Get additional card info
-        card_info = _get_card_info(conn, card_name)
-
-        recommendations.append(
-            {
-                "name": card_name,
-                "synergy_score": row["synergy_score"] or 0.0,
-                "inclusion_rate": row["inclusion_rate"] or 0.0,
-                "category": row["category"],
-                "cmc": card_info.get("cmc", 0),
-                "type_line": card_info.get("type_line"),
-                "reason": _generate_recommendation_reason(
-                    row["synergy_score"],
-                    row["inclusion_rate"],
-                    row["category"],
-                ),
-            }
+        # Get recommendations
+        recs = (
+            session.query(CommanderRecommendation)
+            .filter(CommanderRecommendation.commander_id == cmd.id)
+            .order_by(
+                CommanderRecommendation.synergy_score.desc(),
+                CommanderRecommendation.inclusion_rate.desc(),
+            )
+            .all()
         )
 
-        if len(recommendations) >= count:
-            break
+        recommendations = []
+        total_available = len(recs)
 
-    conn.close()
+        for rec in recs:
+            card_name = rec.card_name
 
-    return {
-        "commander": synergy_data.commander_name,
-        "recommendations": recommendations,
-        "total_available": total_available,
-    }
+            # Skip excluded cards
+            if card_name.lower() in exclude_set:
+                continue
+
+            # Filter by category if specified
+            if categories:
+                card_category = rec.category or ""
+                if not any(cat.lower() in card_category.lower() for cat in categories):
+                    continue
+
+            # Get additional card info
+            card_info = _get_card_info(session, card_name)
+
+            recommendations.append(
+                {
+                    "name": card_name,
+                    "synergy_score": rec.synergy_score or 0.0,
+                    "inclusion_rate": rec.inclusion_rate or 0.0,
+                    "category": rec.category,
+                    "cmc": card_info.get("cmc", 0),
+                    "type_line": card_info.get("type_line"),
+                    "reason": _generate_recommendation_reason(
+                        rec.synergy_score,
+                        rec.inclusion_rate,
+                        rec.category,
+                    ),
+                }
+            )
+
+            if len(recommendations) >= count:
+                break
+
+        return {
+            "commander": synergy_data.commander_name,
+            "recommendations": recommendations,
+            "total_available": total_available,
+        }
 
 
 def get_card_recommendations(
@@ -273,15 +269,13 @@ def get_card_recommendations(
     )
 
 
-def _get_card_info(conn, card_name: str) -> dict:
+def _get_card_info(session, card_name: str) -> dict:
     """Get basic card info from database."""
-    cursor = conn.execute(
-        "SELECT cmc, type_line FROM cards WHERE name = ?",
-        (card_name,),
-    )
-    row = cursor.fetchone()
-    if row:
-        return {"cmc": row["cmc"] or 0, "type_line": row["type_line"]}
+    from src.data.db_models import CardModel
+
+    card = session.query(CardModel).filter(CardModel.name == card_name).first()
+    if card:
+        return {"cmc": card.cmc or 0, "type_line": card.type_line}
     return {"cmc": 0, "type_line": None}
 
 
@@ -332,7 +326,7 @@ def analyze_deck(
     Returns:
         AnalyzeDeckResponse or None if commander not found
     """
-    from src.data.database import DEFAULT_DB_PATH, CardDatabase
+    from src.data.database import CardDatabase
     from src.data.deck_loader import load_synergy_data
     from src.game import GreedyPolicy, Simulator
 
@@ -342,7 +336,7 @@ def analyze_deck(
         return None
 
     # Resolve cards from database
-    db = CardDatabase(DEFAULT_DB_PATH)
+    db = CardDatabase()
     resolved_cards = []
     missing_cards = []
     card_objects = {}
@@ -751,11 +745,11 @@ def run_simulation(
     Returns:
         SimulateResponse or None if cards can't be resolved
     """
-    from src.data.database import DEFAULT_DB_PATH, CardDatabase
+    from src.data.database import CardDatabase
     from src.game import GreedyPolicy, Simulator
 
     # Resolve cards
-    db = CardDatabase(DEFAULT_DB_PATH)
+    db = CardDatabase()
     resolved_cards = []
     commander_card = None
 
