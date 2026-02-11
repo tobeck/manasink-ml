@@ -95,6 +95,9 @@ services:
     container_name: manasink-sync
     environment:
       DATABASE_URL: postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-manasink}
+      PYTHONPATH: /app
+    volumes:
+      - sync_data:/app/data
     depends_on:
       postgres:
         condition: service_healthy
@@ -151,6 +154,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  sync_data:
     driver: local
 
 # ==========================================================================
