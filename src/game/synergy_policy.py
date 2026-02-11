@@ -280,24 +280,22 @@ class SynergyAwarePolicy(Policy):
 
 def load_synergy_context(
     commander_name: str,
-    db_path: Path | None = None,
+    db_path: str | None = None,
 ) -> SynergyContext | None:
     """
     Load synergy context for a commander from the database.
 
     Args:
         commander_name: Name of the commander
-        db_path: Path to SQLite database
+        db_path: Ignored, uses DatabaseManager
 
     Returns:
         SynergyContext or None if not found
     """
     # Import here to avoid circular imports
-    from src.data.deck_loader import DEFAULT_DB_PATH, load_synergy_data
+    from src.data.deck_loader import load_synergy_data
 
-    db_path = db_path or DEFAULT_DB_PATH
-
-    synergy_data = load_synergy_data(commander_name, db_path)
+    synergy_data = load_synergy_data(commander_name)
 
     if not synergy_data:
         return None

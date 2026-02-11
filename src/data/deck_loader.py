@@ -12,13 +12,13 @@ Features:
 - Load synergy data alongside decks for training
 """
 
-import sqlite3
 from dataclasses import dataclass
-from pathlib import Path
 
 from src.game.card import Card, CardType, Color
 
-from .database import DEFAULT_DB_PATH, CardDatabase
+from .database import CardDatabase
+from .db_config import DatabaseManager
+from .db_models import AverageDeckCard, CommanderModel, CommanderRecommendation
 
 
 @dataclass
@@ -65,171 +65,158 @@ class SynergyData:
 
 def load_deck_from_edhrec(
     commander_name: str,
-    db_path: Path | None = None,
+    db_path: str | None = None,
 ) -> DeckLoadResult | None:
     """
     Load a deck from EDHREC average deck data.
 
     Args:
         commander_name: Name of the commander
-        db_path: Path to SQLite database
+        db_path: Path to SQLite database (ignored, uses DatabaseManager)
 
     Returns:
         DeckLoadResult with commander, deck cards, and missing cards
         Returns None if commander not found or no average deck data
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    # Use SQLAlchemy for database access
+    manager = DatabaseManager()
 
-    if not db_path.exists():
-        return None
+    with manager.session() as session:
+        # Find commander in database
+        cmd = (
+            session.query(CommanderModel)
+            .filter(
+                (CommanderModel.name == commander_name)
+                | (CommanderModel.name.ilike(f"%{commander_name}%"))
+            )
+            .first()
+        )
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+        if not cmd:
+            return None
 
-    # Find commander in database
-    cursor = conn.execute(
-        "SELECT id, name, color_identity FROM commanders WHERE name = ? OR name LIKE ?",
-        (commander_name, f"%{commander_name}%"),
-    )
-    cmd_row = cursor.fetchone()
+        commander_id = cmd.id
+        commander_name_resolved = cmd.name
+        color_identity_str = cmd.color_identity or ""
 
-    if not cmd_row:
-        conn.close()
-        return None
+        # Parse color identity
+        color_map = {
+            "W": Color.WHITE,
+            "U": Color.BLUE,
+            "B": Color.BLACK,
+            "R": Color.RED,
+            "G": Color.GREEN,
+        }
+        color_identity = {color_map[c] for c in color_identity_str if c in color_map}
 
-    commander_id = cmd_row["id"]
-    commander_name_resolved = cmd_row["name"]
-    color_identity_str = cmd_row["color_identity"] or ""
+        # Get the commander Card object
+        db = CardDatabase()
+        commander_card = db.get_card(commander_name_resolved)
 
-    # Parse color identity
-    color_map = {
-        "W": Color.WHITE,
-        "U": Color.BLUE,
-        "B": Color.BLACK,
-        "R": Color.RED,
-        "G": Color.GREEN,
-    }
-    color_identity = {color_map[c] for c in color_identity_str if c in color_map}
+        if not commander_card:
+            db.close()
+            return None
 
-    # Get the commander Card object
-    db = CardDatabase(db_path)
-    commander_card = db.get_card(commander_name_resolved)
+        # Get average deck card names
+        avg_cards = (
+            session.query(AverageDeckCard)
+            .filter(AverageDeckCard.commander_id == commander_id)
+            .order_by(AverageDeckCard.slot_number)
+            .all()
+        )
 
-    if not commander_card:
-        conn.close()
+        card_names = [c.card_name for c in avg_cards]
+
+        if not card_names:
+            db.close()
+            return None
+
+        # Resolve card names to Card objects
+        deck = []
+        missing = []
+
+        for name in card_names:
+            card = db.get_card(name)
+            if card:
+                deck.append(card)
+            else:
+                missing.append(name)
+
         db.close()
-        return None
 
-    # Get average deck card names
-    cursor = conn.execute(
-        "SELECT card_name FROM average_decks WHERE commander_id = ? ORDER BY slot_number",
-        (commander_id,),
-    )
-    card_names = [row["card_name"] for row in cursor]
-    conn.close()
-
-    if not card_names:
-        db.close()
-        return None
-
-    # Resolve card names to Card objects
-    deck = []
-    missing = []
-
-    for name in card_names:
-        card = db.get_card(name)
-        if card:
-            deck.append(card)
-        else:
-            missing.append(name)
-
-    db.close()
-
-    return DeckLoadResult(
-        commander=commander_card,
-        deck=deck,
-        missing_cards=missing,
-        color_identity=color_identity or commander_card.color_identity,
-    )
+        return DeckLoadResult(
+            commander=commander_card,
+            deck=deck,
+            missing_cards=missing,
+            color_identity=color_identity or commander_card.color_identity,
+        )
 
 
 def load_synergy_data(
     commander_name: str,
-    db_path: Path | None = None,
+    db_path: str | None = None,
 ) -> SynergyData | None:
     """
     Load synergy data for a commander's recommended cards.
 
     Args:
         commander_name: Name of the commander
-        db_path: Path to SQLite database
+        db_path: Ignored, uses DatabaseManager
 
     Returns:
         SynergyData with card synergies, inclusions, and categories
         Returns None if commander not found
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    manager = DatabaseManager()
 
-    if not db_path.exists():
-        return None
+    with manager.session() as session:
+        # Find commander
+        cmd = (
+            session.query(CommanderModel)
+            .filter(
+                (CommanderModel.name == commander_name)
+                | (CommanderModel.name.ilike(f"%{commander_name}%"))
+            )
+            .first()
+        )
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+        if not cmd:
+            return None
 
-    # Find commander
-    cursor = conn.execute(
-        "SELECT id, name FROM commanders WHERE name = ? OR name LIKE ?",
-        (commander_name, f"%{commander_name}%"),
-    )
-    cmd_row = cursor.fetchone()
+        # Get all recommendations
+        recs = (
+            session.query(CommanderRecommendation)
+            .filter(CommanderRecommendation.commander_id == cmd.id)
+            .all()
+        )
 
-    if not cmd_row:
-        conn.close()
-        return None
+        synergies = {}
+        inclusions = {}
+        categories = {}
 
-    commander_id = cmd_row["id"]
-    commander_name_resolved = cmd_row["name"]
+        for rec in recs:
+            synergies[rec.card_name] = rec.synergy_score or 0.0
+            inclusions[rec.card_name] = rec.inclusion_rate or 0.0
+            categories[rec.card_name] = rec.category or ""
 
-    # Get all recommendations
-    cursor = conn.execute(
-        """
-        SELECT card_name, synergy_score, inclusion_rate, category
-        FROM commander_recommendations
-        WHERE commander_id = ?
-    """,
-        (commander_id,),
-    )
-
-    synergies = {}
-    inclusions = {}
-    categories = {}
-
-    for row in cursor:
-        card_name = row["card_name"]
-        synergies[card_name] = row["synergy_score"] or 0.0
-        inclusions[card_name] = row["inclusion_rate"] or 0.0
-        categories[card_name] = row["category"] or ""
-
-    conn.close()
-
-    return SynergyData(
-        commander_name=commander_name_resolved,
-        card_synergies=synergies,
-        card_inclusions=inclusions,
-        card_categories=categories,
-    )
+        return SynergyData(
+            commander_name=cmd.name,
+            card_synergies=synergies,
+            card_inclusions=inclusions,
+            card_categories=categories,
+        )
 
 
 def load_deck_with_synergy_data(
     commander_name: str,
-    db_path: Path | None = None,
+    db_path: str | None = None,
 ) -> tuple[DeckLoadResult | None, SynergyData | None]:
     """
     Load both deck and synergy data for a commander.
 
     Args:
         commander_name: Name of the commander
-        db_path: Path to SQLite database
+        db_path: Ignored, uses DatabaseManager
 
     Returns:
         Tuple of (DeckLoadResult, SynergyData), either may be None
@@ -241,7 +228,7 @@ def load_deck_with_synergy_data(
 
 
 def list_available_commanders(
-    db_path: Path | None = None,
+    db_path: str | None = None,
     min_decks: int = 100,
     color_identity: str | None = None,
     limit: int = 100,
@@ -250,7 +237,7 @@ def list_available_commanders(
     List commanders that have average deck data available.
 
     Args:
-        db_path: Path to SQLite database
+        db_path: Ignored, uses DatabaseManager
         min_decks: Minimum number of decks for the commander
         color_identity: Filter by color identity (e.g., "UG")
         limit: Maximum results
@@ -258,52 +245,43 @@ def list_available_commanders(
     Returns:
         List of commander dicts with name, num_decks, color_identity
     """
-    db_path = db_path or DEFAULT_DB_PATH
+    manager = DatabaseManager()
 
-    if not db_path.exists():
-        return []
+    with manager.session() as session:
+        # Only commanders that have average deck data
+        commanders_with_decks = (
+            session.query(AverageDeckCard.commander_id)
+            .distinct()
+            .subquery()
+        )
 
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
+        query = (
+            session.query(CommanderModel)
+            .filter(
+                CommanderModel.num_decks >= min_decks,
+                CommanderModel.id.in_(
+                    session.query(commanders_with_decks.c.commander_id)
+                ),
+            )
+        )
 
-    # Build query
-    conditions = ["num_decks >= ?"]
-    params = [min_decks]
+        if color_identity:
+            query = query.filter(
+                CommanderModel.color_identity == "".join(sorted(color_identity.upper()))
+            )
 
-    if color_identity:
-        # Filter by color identity (subset match)
-        conditions.append("color_identity = ?")
-        params.append("".join(sorted(color_identity.upper())))
+        query = query.order_by(CommanderModel.num_decks.desc()).limit(limit)
 
-    # Only include commanders with average deck data
-    conditions.append("id IN (SELECT DISTINCT commander_id FROM average_decks)")
-
-    where_clause = " AND ".join(conditions)
-
-    cursor = conn.execute(
-        f"""
-        SELECT name, num_decks, color_identity, edhrec_rank, salt_score
-        FROM commanders
-        WHERE {where_clause}
-        ORDER BY num_decks DESC
-        LIMIT ?
-    """,
-        params + [limit],
-    )
-
-    results = [
-        {
-            "name": row["name"],
-            "num_decks": row["num_decks"],
-            "color_identity": row["color_identity"],
-            "edhrec_rank": row["edhrec_rank"],
-            "salt_score": row["salt_score"],
-        }
-        for row in cursor
-    ]
-
-    conn.close()
-    return results
+        return [
+            {
+                "name": cmd.name,
+                "num_decks": cmd.num_decks,
+                "color_identity": cmd.color_identity,
+                "edhrec_rank": cmd.edhrec_rank,
+                "salt_score": cmd.salt_score,
+            }
+            for cmd in query.all()
+        ]
 
 
 def get_deck_stats(deck_result: DeckLoadResult) -> dict:
